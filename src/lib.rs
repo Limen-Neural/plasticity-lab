@@ -1,10 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
-//! Generic reward-modulated plasticity loops for spiking neural networks.
+//! Reward-modulated SNN learning/training orchestration layer for the
+//! Limen-Neural stack.
 //!
-//! This crate provides a small training loop around [`neuromod::SpikingNetwork`]:
-//! single-step reward modulation via [`SpikenautTrainer::train_step`] and batch
-//! sessions via [`SpikenautTrainer::run_session`].
+//! This crate sits above [`neuromod::SpikingNetwork`], which owns neuron/network
+//! dynamics, neuromodulator state, and the foundational classical and
+//! reward-modulated STDP primitives. `plasticity-lab` does not reimplement those
+//! primitives — it drives them through `neuromod`'s public API: single-step
+//! reward modulation via [`SpikenautTrainer::train_step`] and batch sessions via
+//! [`SpikenautTrainer::run_session`].
 //!
 //! # Features
 //!
@@ -40,7 +44,10 @@
 //! // or: network.step(&stimuli, &to_neuromodulators(&vector));
 //! ```
 //!
-//! See the crate README for ecosystem map, ownership boundaries, and patterns.
+//! See the crate README for the ecosystem map, [scope/ownership
+//! boundaries](https://github.com/Limen-Neural/plasticity-lab#scope-and-ownership-boundaries)
+//! (including the boundary with `neuromod`'s network dynamics and plasticity
+//! primitives), and common usage patterns.
 
 pub mod config;
 pub mod trainer;

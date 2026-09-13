@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 /// Configuration knobs for [`crate::SpikenautTrainer`].
 ///
-/// Values are serializable (serde) so they can be stored with checkpoints or
-/// experiment configs. Defaults match a light reward-modulated loop; adjust as
-/// homeostasis and plasticity rules expand. Field docs appear under **Fields**
-/// in rustdoc.
+/// Values are serializable (serde) so callers can persist them as part of their
+/// own experiment configs or checkpointing setup; this crate does not implement
+/// checkpointing itself. Defaults match a light reward-modulated loop. Field
+/// docs appear under **Fields** in rustdoc.
 ///
 /// Missing fields deserialize via [`Default`] (`#[serde(default)]` on the struct).
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -11,7 +11,7 @@ recorded in the tracking issue. As of this writing:
 - #64, #65, #66 — closed (scope, trainer rename, config honesty)
 - #67, #68 — the dependency/feature cleanup and metadata hygiene are done;
   the git-dependency → crates.io-version conversion stays **explicitly
-  deferred** (see [Known limitation](#known-limitation-cargo-package) below)
+  deferred** (see [Known limitation](#known-limitation-these-currently-fail) below)
 - #47 — rustdoc/doctest coverage, closed
 - #46 — feature-matrix CI; its original PR (#78) merged into a branch that
   was later squash-merged separately and didn't carry the change through to
@@ -60,7 +60,7 @@ cargo package
 cargo publish --dry-run
 ```
 
-### <a name="known-limitation-cargo-package"></a>Known limitation: these currently fail
+### Known limitation: these currently fail
 
 `cargo package` and `cargo publish --dry-run` **cannot succeed today**.
 Cargo requires a version requirement for every dependency — including

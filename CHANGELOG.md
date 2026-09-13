@@ -19,6 +19,10 @@ All notable changes to this project are documented in this file.
 - `TrainingConfig` deserializes missing fields via `#[serde(default)]` so older configs without `use_reward_modulation` still load (`true` by default)
 - Trainer reward path uses `norepinephrine` after neuromod removed `cortisol` (API drift on git `main`)
 
+### Removed
+
+- Qodana Cloud scan workflow and `qodana.yaml` (membership expired; Clippy/Codacy remain)
+
 ### Changed
 
 - Git deps `neuromod`, `limbic-critic`, and `axon-encoder` re-pinned to current main tips (norepinephrine API / standalone `ModulatorVector`); intentional rev bumps only

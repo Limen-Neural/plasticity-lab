@@ -6,6 +6,30 @@ All notable changes to this project are documented in this file.
 
 ### Removed (breaking)
 
+- The `integration` feature is renamed `critic`, and no longer pulls
+  `axon-encoder` (#67). `axon-encoder` was declared as an optional dependency
+  but no code in this crate ever consumed it — it was retained solely to make
+  Cargo resolve the sibling crate, which is exactly the kind of feature #67
+  flags as not publishable. The bridge to `limbic-critic` is unaffected
+  besides the feature name.
+
+  **Migration:**
+
+  ```toml
+  # Before
+  plasticity-lab = { git = "...", features = ["integration"] }
+
+  # After
+  plasticity-lab = { git = "...", features = ["critic"] }
+  ```
+
+  If you were relying on this crate to pull in `axon-encoder` transitively,
+  add it directly to your own `Cargo.toml` instead.
+
+- `rand` and `tracing` are removed from `[dependencies]` (#67, #68): neither
+  had any code in `src/` using them. `serde_json` moves from `[dependencies]`
+  to `[dev-dependencies]`, since it is only used by `config.rs` tests.
+
 - `TrainingConfig::learning_rate`, `TrainingConfig::target_spikes_per_step`,
   `TrainingConfig::homeostasis_strength`, and `TrainingConfig::batch_size` (#66).
   None of these fields were ever read by `SpikenautTrainer` or anything it
@@ -49,12 +73,25 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
-- `bridge` module (`integration` feature): 1:1 adapter from `limbic-critic::ModulatorVector` to `neuromod::NeuroModulators` (`to_neuromodulators`, `from_neuromodulators`, `apply_modulator_vector`) (#17)
+- `bridge` module (`critic` feature): 1:1 adapter from `limbic-critic::ModulatorVector` to `neuromod::NeuroModulators` (`to_neuromodulators`, `from_neuromodulators`, `apply_modulator_vector`) (#17)
 - `PlasticityTrainer::train_step_with_modulators` for explicit neuromodulator steps
-- `PlasticityTrainer::train_step_from_critic` (`integration`) for critic vectors via the bridge
+- `PlasticityTrainer::train_step_from_critic` (`critic`) for critic vectors via the bridge
 - Expanded README user guides: getting started, ecosystem map, feature choice, common patterns, architecture brief, cross-language notes (#14)
 - Crate- and item-level rustdoc for public API (`TrainingConfig`, `PlasticityTrainer`, `TrainingSummary`, etc.)
 - CI step: `cargo doc --no-deps --all-features` with broken-doc-link warnings denied
+- `Cargo.toml` package metadata: `repository`, `readme`, `keywords`, `categories`, and an `exclude` list scoping the published package to release-relevant files (#68)
+
+### Known limitations
+
+- `cargo package` and `cargo publish --dry-run` cannot succeed yet: `limbic-critic`
+  is a `branch = "main"` git dependency with no crates.io version, and Cargo
+  requires a version requirement for every dependency (including
+  feature-gated/optional ones) when packaging a crate for publish. The same
+  applies to `neuromod` once dependent resolution reaches it. This is a
+  pre-existing, cross-repo blocker (#67) — it is **not** worked around by
+  re-pinning to a different mutable git ref, per this repo's own review policy
+  (see `REVIEW.md`, `CLAUDE.md`). Publishing `neuromod` and `limbic-critic` to
+  crates.io first is a prerequisite for a real `cargo publish` of this crate.
 
 ### Deprecated
 

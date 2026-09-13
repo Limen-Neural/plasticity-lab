@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `rust-toolchain.toml` pins the toolchain for local dev, and — less obviously — for the `validate` job too: every step in that job invokes bare `cargo`/`rustc`, and rustup's directory-override resolution means a committed `rust-toolchain.toml` wins over whatever the `dtolnay/rust-toolchain` action set as the rustup default (verified against that action's source: it only runs `rustup default <toolchain>`, never a `+<version>`/PATH override that would beat a directory file). That action's `toolchain:` input mainly guarantees the version is installed and matches `rust-toolchain.toml`'s current value — keep them in sync as a matter of hygiene, but `rust-toolchain.toml` is what's actually driving `validate`'s `fmt`/`clippy`/`build`/`test`/`doc` steps. The `msrv` job is genuinely different: its build/test steps use explicit `cargo +<version> ...` (not bare `cargo`), and an explicit `+toolchain` override wins over any directory file — that job really is decoupled from `rust-toolchain.toml`, by design (see its own comment in the workflow). Two separate rules, don't conflate them: raising the actual MSRV means bumping `Cargo.toml`'s `rust-version` and *every* version literal in the `msrv` job together — that's three spots, not two: the `Install MSRV toolchain` step's `toolchain:` input (which controls what actually gets installed) as well as both `cargo +<version>` invocations (which select among installed toolchains but can't install one — `+toolchain` requires it to already be present). Bumping only the `cargo +<version>` lines without the install step leaves the new version uninstalled and the job broken. Advancing the day-to-day toolchain means bumping `rust-toolchain.toml`'s `channel` and the `validate` job's `dtolnay/rust-toolchain` input together — but that's not the complete list either: `.devcontainer/Dockerfile`'s `FROM rust:<version>-slim-bookworm`, `.devcontainer/devcontainer.json`'s `name` field, and `.devin/blueprint.yaml`'s three `rustup ... <version>` lines all hardcode the same version independently and don't derive from `rust-toolchain.toml` or anything else, so they go stale silently if skipped (`.devcontainer/devcontainer.json`'s `name` was missed exactly this way during a past bump — check its current value against `rust-toolchain.toml` rather than trusting it). `README.md` and `AGENTS.md` also state the version in prose. None of this requires touching the `msrv` job. (Deliberately not naming a specific version number anywhere in this paragraph — check `Cargo.toml`'s `rust-version` for the actual current value, since any literal written here will go stale on the next bump, as happened to an earlier draft of this very paragraph.)
 
-The `integration` feature (off by default) pulls `limbic-critic` and `axon-encoder` as git dependencies tracking `Limen-Neural/*` `main`. Most feature-gated code (`src/bridge.rs`, `PlasticityTrainer::train_step_from_critic`) only compiles/tests with `--all-features` or `--features integration` — plain `cargo test` will silently skip it.
+The `critic` feature (off by default, renamed from `integration` in #67 — `axon-encoder` was dropped entirely since no code in this crate ever consumed it) pulls `limbic-critic` as a git dependency tracking `Limen-Neural/limbic-critic` `main`. Feature-gated code (`src/bridge.rs`, `PlasticityTrainer::train_step_from_critic`) only compiles/tests with `--all-features` or `--features critic` — plain `cargo test` will silently skip it.
 
 ## Architecture
 
@@ -33,17 +33,17 @@ plasticity-lab  — (this crate) training/session orchestration over neuromod
     ↓
 applications / supervisors
 
-axon-encoder    — input encoding (sibling; optional, behind `integration`)
-limbic-critic   — reward shaping (sibling; optional, behind `integration`)
+axon-encoder    — input encoding (sibling; not a dependency of this crate, see #67)
+limbic-critic   — reward shaping (sibling; optional, behind `critic`)
 ```
 
 Source layout (`src/`):
 
-- `lib.rs` — public re-exports only; the `bridge` module and its re-exports are `#[cfg(feature = "integration")]`-gated
+- `lib.rs` — public re-exports only; the `bridge` module and its re-exports are `#[cfg(feature = "critic")]`-gated
 - `trainer.rs` — `PlasticityTrainer`, with three step variants and one batch entry point:
   - `train_step` — applies scalar-reward → neuromodulator shift, then steps the network
   - `train_step_with_modulators` — steps with explicit `NeuroModulators`, no reward math
-  - `train_step_from_critic` (integration only) — converts a `limbic_critic::ModulatorVector` via `bridge`, then calls `train_step_with_modulators`
+  - `train_step_from_critic` (`critic` feature only) — converts a `limbic_critic::ModulatorVector` via `bridge`, then calls `train_step_with_modulators`
   - `run_session` — snapshots per-neuron thresholds/weights before the batch, replays `train_step` over each `TrainingExample`, and diffs against the snapshot to build `TrainingSummary` (`threshold_drifts`, `weight_drifts`, `per_neuron_spikes`, `avg_reward`)
 - `config.rs` — `TrainingConfig`; always deserializes via `#[serde(default)]` on the struct so partial/old configs stay forward-compatible
 - `bridge.rs` — `to_neuromodulators`/`from_neuromodulators` are pure conversions between `limbic_critic::ModulatorVector` and `neuromod::NeuroModulators`, matched by field *name* (`dopamine: v.dopamine`, etc.) — a named-field struct literal is immune to reordering, so the risk after bumping either sibling dependency isn't a reordered field, it's a field being renamed/removed (a compile error, so it's caught) or a same-named field's meaning quietly changing (not caught by the compiler — re-verify semantics, not just presence). `apply_modulator_vector` is not pure: it takes `&mut SpikingNetwork` and calls `network.step(...)`, so it's the one side-effecting entry point in this module.
@@ -55,7 +55,7 @@ One behavioral detail that isn't obvious from the public API alone:
 ## Ecosystem/ownership boundaries
 
 - STDP/R-STDP primitives and network dynamics belong to `neuromod` — do not reimplement them here even when it would be convenient for a new training feature.
-- This crate never encodes inputs or shapes rewards itself. `train_step`/`run_session` take precomputed `stimuli: &[f32]` and a scalar `reward: f32`; `train_step_with_modulators` and, under `integration`, `train_step_from_critic`/`apply_modulator_vector` take `stimuli: &[f32]` plus explicit `NeuroModulators`/`ModulatorVector` instead of a scalar reward. Encoding is `axon-encoder`'s job, reward shaping is `limbic-critic`'s.
+- This crate never encodes inputs or shapes rewards itself. `train_step`/`run_session` take precomputed `stimuli: &[f32]` and a scalar `reward: f32`; `train_step_with_modulators` and, under `critic`, `train_step_from_critic`/`apply_modulator_vector` take `stimuli: &[f32]` plus explicit `NeuroModulators`/`ModulatorVector` instead of a scalar reward. Encoding is `axon-encoder`'s job (not a dependency here — wire it in yourself), reward shaping is `limbic-critic`'s.
 - No domain-specific training logic (e.g. mining, trading) and no distillation/teacher-student transfer — that belongs to `SynapticDistill.jl` (Julia sister project, not a binding of this crate).
 - No `unsafe` code (enforced by Codacy static analysis).
 - Git dependencies are pinned by `branch = "main"`, not `rev` — don't change that without discussion (see `REVIEW.md`), and treat `deny.toml`'s `allow-git` list as the source of truth for which git hosts are permitted.

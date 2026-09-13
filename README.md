@@ -24,7 +24,7 @@ Reusable SNN learning/training orchestration layer: reward-modulated training lo
 It is intentionally domain-agnostic:
 
 - Neuron/network dynamics and low-level plasticity primitives (STDP, R-STDP) belong to [`neuromod`](https://github.com/Limen-Neural/neuromod)
-- Input encoding belongs to [`axon-encoder`](https://github.com/Limen-Neural/axon-encoder)
+- Input encoding belongs to [`axon-encoder`](https://github.com/Limen-Neural/axon-encoder) (not a dependency of this crate — see [Choosing features](#choosing-features))
 - Reward shaping belongs to [`limbic-critic`](https://github.com/Limen-Neural/limbic-critic)
 - This crate orchestrates the training/session loop, maps rewards or modulator vectors into training steps, and tracks training summaries
 
@@ -37,17 +37,17 @@ If you are new to the Limen-Neural stack, start with [Getting started](#getting-
 | **plasticity-lab** (this crate) | Training/session orchestration (`train_step`, `run_session`) | Rust | You need a reward-modulated SNN training loop and session metrics |
 | [neuromod](https://github.com/Limen-Neural/neuromod) | Core SNN dynamics, neuromodulator types, and foundational (classical + reward-modulated) STDP primitives (`SpikingNetwork`, `NeuroModulators`) | Rust | You need the network, step dynamics, modulator state, or the underlying plasticity rules |
 | [limbic-critic](https://github.com/Limen-Neural/limbic-critic) | Reward shaping | Rust | You need shaped / multi-signal rewards instead of raw scalars |
-| [axon-encoder](https://github.com/Limen-Neural/axon-encoder) | Input encoding | Rust | You need to turn raw features into spike stimuli |
+| [axon-encoder](https://github.com/Limen-Neural/axon-encoder) | Input encoding | Rust | You need to turn raw features into spike stimuli — not a dependency of this crate; wire it in yourself |
 | [SynapticDistill.jl](https://github.com/Limen-Neural/SynapticDistill.jl) | Distillation / knowledge transfer | **Julia only** | Teacher–student or differentiable distillation — not STDP |
 
 Typical Rust data path:
 
 ```text
 raw inputs
-  → axon-encoder (optional, feature = "integration")
+  → axon-encoder (your own glue code; not a dependency of this crate)
   → plasticity-lab::train_step / run_session
   → neuromod::SpikingNetwork
-  ← limbic-critic reward (optional, feature = "integration")
+  ← limbic-critic reward (optional, feature = "critic")
 ```
 
 See also the ownership boundary with [SynapticDistill.jl](#boundary-with-synapticdistilljl-linear-lim-25) below.
@@ -107,26 +107,26 @@ For a single network step with an external reward, call `train_step` directly (s
 
 ### 4. Optional integrations
 
-To pull in `limbic-critic` and `axon-encoder` as optional deps, enable the `integration` feature — see [Choosing features](#choosing-features).
+To pull in `limbic-critic` as an optional dep and enable the critic → neuromodulator bridge, enable the `critic` feature — see [Choosing features](#choosing-features).
 
 ## Choosing features
 
 | Feature | Default? | What it enables |
 |---------|----------|-----------------|
-| *(none)* / default | yes | Core loop only: depends on `neuromod` + serde/tracing/rand/thiserror |
-| `integration` | no | Optional deps: `limbic-critic` (rewards) and `axon-encoder` (encoding) |
+| *(none)* / default | yes | Core loop only: depends on `neuromod` + serde/thiserror |
+| `critic` | no | Optional dep on `limbic-critic`, plus the `bridge` module that converts `limbic_critic::ModulatorVector` into `neuromod::NeuroModulators` |
 
 ```toml
 # Core only (recommended first step)
 plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab" }
 
-# With sister-crate integration deps
-plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", features = ["integration"] }
+# With the critic bridge
+plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", features = ["critic"] }
 ```
 
-**When to use default:** you already shape rewards and encode inputs yourself (or use plain `f32` stimuli and scalar rewards, as in the getting-started example).
+**When to use default:** you already shape rewards and encode inputs yourself (or use plain `f32` stimuli and scalar rewards, as in the getting-started example). This includes any input-encoding needs — `axon-encoder` is a standalone sibling crate you wire in yourself; this crate never depends on it (see [Architecture brief](#architecture-brief)).
 
-**When to enable `integration`:** you want Cargo to resolve `limbic-critic` and `axon-encoder` alongside this crate for a full encoding → train → reward pipeline. The core trainer API does not require the feature; it always takes precomputed `stimuli: &[f32]` and `reward: f32`.
+**When to enable `critic`:** you want Cargo to resolve `limbic-critic` alongside this crate and use the `bridge` adapter to turn a `ModulatorVector` into a training step via `train_step_from_critic`/`apply_modulator_vector`. The core trainer API does not require the feature; it always takes precomputed `stimuli: &[f32]` and `reward: f32`.
 
 ## Common patterns
 
@@ -161,7 +161,7 @@ fn main() -> Result<(), StepError> {
 - Positive → dopamine up / norepinephrine down (clamped)
 - Negative → norepinephrine up / dopamine adjusted (clamped)
 
-Shape rewards in application code or via [`limbic-critic`](https://github.com/Limen-Neural/limbic-critic) when using the `integration` feature.
+Shape rewards in application code or via [`limbic-critic`](https://github.com/Limen-Neural/limbic-critic) when using the `critic` feature.
 
 ### Custom input encoding (with or without axon-encoder)
 
@@ -236,7 +236,7 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
              plasticity-lab   (this crate)
                   │  training/session orchestration: train_step,
                   │  run_session, reward/modulator-vector mapping,
-                  │  batches, metrics, integration adapters
+                  │  batches, metrics, critic bridge adapter
                   ▼
                 neuromod
                    SpikingNetwork, neuron/network dynamics,
@@ -250,7 +250,7 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 - Training examples / batches (`TrainingExample`)
 - Progress and training summaries (`TrainingSummary`)
 - Training/session metrics and invariants (spike counts, threshold/weight drift, empty-batch rejection)
-- Integration adapters between independently owned crates (the `bridge` module)
+- The critic → neuromodulator adapter between independently owned crates (the `bridge` module, `critic` feature)
 - Checkpoint/session orchestration, if/when it is actually implemented — **not implemented today** (see [Does Not Own](#does-not-own))
 
 ### Does Not Own
@@ -260,7 +260,7 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 - Foundational reward-modulated STDP / eligibility-trace primitives — owned by `neuromod`
 - Low-level plasticity configuration applied by the network engine — owned by `neuromod`
 - Reward shaping — owned by [`limbic-critic`](https://github.com/Limen-Neural/limbic-critic)
-- Input encoding — owned by [`axon-encoder`](https://github.com/Limen-Neural/axon-encoder)
+- Input encoding — owned by [`axon-encoder`](https://github.com/Limen-Neural/axon-encoder); this crate does not depend on it
 - Differentiable or online distillation and teacher-student knowledge transfer — owned by [`SynapticDistill.jl`](https://github.com/Limen-Neural/SynapticDistill.jl)
 - Domain-specific training logic (mining, trading, etc.)
 - Checkpointing and model serialization — **not currently implemented** in this crate; do not assume it exists
@@ -278,10 +278,10 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 
 ### Allowed Dependencies
 - `neuromod` (network dynamics, neuromodulator state, and low-level plasticity primitives)
-- `limbic-critic` (for reward shaping)
-- `axon-encoder` (for input encoding)
-- Math and statistics libraries
+- `limbic-critic` (`critic` feature only — for reward shaping via the bridge)
 - Serialization libraries
+
+`axon-encoder` is intentionally **not** a dependency: this crate has no code that consumes it, so it isn't retained just to make Cargo resolve it (see #67). Re-add it only if a concrete API surface with tests needs it.
 
 ### Forbidden Dependencies
 - Domain-specific training logic

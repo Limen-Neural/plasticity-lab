@@ -119,7 +119,7 @@ impl PlasticityTrainer {
     ///
     /// Converts via [`crate::bridge::to_neuromodulators`] then steps. Available only
     /// with the `integration` feature.
-    #[cfg(feature = "integration")]
+    #[cfg(feature = "critic")]
     pub fn train_step_from_critic(
         &mut self,
         network: &mut SpikingNetwork,
@@ -498,7 +498,7 @@ mod tests {
         assert_eq!(summary.avg_reward, 0.0);
     }
 
-    #[cfg(feature = "integration")]
+    #[cfg(feature = "critic")]
     #[test]
     fn train_step_from_critic_uses_bridge() {
         use limbic_critic::ModulatorVector;

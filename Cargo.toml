@@ -2,7 +2,7 @@
 name = "plasticity-lab"
 version = "0.1.0"
 edition = "2024"
-description = "Generic reward-modulated plasticity loops for spiking neural networks"
+description = "Reward-modulated SNN training/session orchestration loop above neuromod's plasticity primitives"
 license = "MIT OR Apache-2.0"
 # Bounded by the neuromod/axon-encoder git dependencies, which currently require 1.97.1.
 rust-version = "1.97.1"

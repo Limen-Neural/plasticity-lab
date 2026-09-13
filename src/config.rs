@@ -13,8 +13,9 @@ use serde::{Deserialize, Serialize};
 /// its own learning rate and thresholds from the neuromodulator state passed
 /// into `step`.
 ///
-/// Values are serializable (serde) so they can be stored with checkpoints or
-/// experiment configs. Missing fields deserialize via [`Default`]
+/// Values are serializable (serde) so callers can persist them as part of their
+/// own experiment configs or checkpointing setup — this crate does not implement
+/// checkpointing itself. Missing fields deserialize via [`Default`]
 /// (`#[serde(default)]` on the struct), and unknown fields (for example from an
 /// older config that still carries a since-removed knob) are ignored rather
 /// than rejected, since the struct does not use `deny_unknown_fields`.

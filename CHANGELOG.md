@@ -73,6 +73,7 @@ All notable changes to this project are documented in this file.
 ### Changed
 
 - **Breaking:** the public trainer type is renamed `SpikenautTrainer` → `PlasticityTrainer` (#65). The crate is pre-1.0 and reusable outside the Spikenaut application, so its primary public type should not carry an application-specific name. Migration: replace `plasticity_lab::SpikenautTrainer` with `plasticity_lab::PlasticityTrainer` in imports and usages; the API surface (`new`, `train_step`, `train_step_with_modulators`, `train_step_from_critic`, `run_session`) is unchanged.
+- Documentation-only: clarified crate scope as the SNN learning/training orchestration layer above `neuromod`'s network dynamics and plasticity primitives; removed inaccurate claims that this crate owns STDP/R-STDP implementations or checkpointing/model serialization (README, crate rustdoc, `AGENTS.md`) (#64)
 - Git deps `neuromod`, `limbic-critic`, and `axon-encoder` re-pinned to current main tips (norepinephrine API / standalone `ModulatorVector`); intentional rev bumps only
 - License switched from GPL-3.0 to dual MIT/Apache-2.0 (chore for better adoption and to align with Limen-Neural org standard; see #9 and master neuromod#19)
   - Added `LICENSE-MIT` and `LICENSE-APACHE-2.0`

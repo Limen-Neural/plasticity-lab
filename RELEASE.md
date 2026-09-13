@@ -81,6 +81,16 @@ published manifest lies about what it resolves to." Wait for the sibling
 crates, or explicitly re-scope this release to depend only on
 already-published siblings.
 
+**Once `neuromod` and `limbic-critic` are actually published, this doesn't
+resolve itself** — publishing them doesn't change this crate's `Cargo.toml`.
+Before rerunning `cargo package`/`cargo publish --dry-run`, edit both
+dependency entries in `Cargo.toml` to add a concrete crates.io version
+requirement (e.g. `neuromod = { version = "0.x", git = "...", branch =
+"main" }`, keeping the git source for as long as this repo still tracks
+`main` rather than a released version — or drop the git source entirely once
+that tracking is no longer needed), then re-run step 2's validation suite
+before returning here.
+
 ## 7. Publish, then tag
 
 Only after step 6 actually succeeds, publish **before** tagging — a tag

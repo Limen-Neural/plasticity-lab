@@ -26,3 +26,12 @@ default = []
 integration = ["dep:limbic-critic", "dep:axon-encoder"]
 
 [workspace]
+
+[profile.dev]
+# SNN simulation (LIF/Izhikevich integration, STDP) is numerically heavy enough
+# that unoptimized debug builds make local test/dev iteration noticeably slow.
+opt-level = 1
+
+[profile.release]
+lto = true
+codegen-units = 1

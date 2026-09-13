@@ -1,0 +1,20 @@
+RELEASE.md
+  s_df3dfe062b68b0::t_4290bdea7f23dc 63
+  s_df3dfe062b68b0::t_889b44cbfdd28c 14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a6c225669a0879609237895baab60b4ccfac6dfa",
+  "prompts": {},
+  "sessions": {
+    "s_df3dfe062b68b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "306d353e-7a36-4204-bee9-cb426990a90d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

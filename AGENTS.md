@@ -80,5 +80,5 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 ## Dependencies
 
 - Allowed: `neuromod`, `limbic-critic`, `axon-encoder`, `serde`, `serde_json`, `tracing`, `thiserror`, `rand`
-- Git deps are pinned to specific revisions (see Cargo.toml)
+- Git deps track `branch = "main"` in `Cargo.toml` (not a `rev` pin); `Cargo.lock` records the currently-resolved commit until `cargo update` bumps it
 - Do not add domain-specific or framework-heavy dependencies

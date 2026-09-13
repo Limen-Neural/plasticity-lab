@@ -18,7 +18,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - License/advisory check: `cargo deny --locked check` (config in `deny.toml`)
 - MSRV build/test — substitute the exact version pinned in `rust-toolchain.toml` (must match `Cargo.toml`'s `rust-version`): `cargo +<version> build --locked --all-features && cargo +<version> test --locked --all-features`
 
-The toolchain is pinned in `rust-toolchain.toml`. `.github/workflows/ci.yml` runs a `validate` job (fmt, clippy, build, test, docs, tarpaulin coverage) and a separate `msrv` job pinned to an explicit `cargo +<version>` toolchain — bump both `Cargo.toml`'s `rust-version` and every `msrv`/toolchain reference in CI together, never just one.
+The toolchain is pinned in `rust-toolchain.toml`. `.github/workflows/ci.yml` runs a `validate` job (fmt, clippy, build, test, docs, tarpaulin coverage) and a separate `msrv` job pinned to an explicit `cargo +<version>` toolchain — bump `rust-toolchain.toml`'s `channel`, `Cargo.toml`'s `rust-version`, and every `msrv`/toolchain reference in CI together, never just one or two of the three (the MSRV command above derives its `<version>` from `rust-toolchain.toml`, so leaving it behind silently reintroduces the mismatch it's meant to prevent).
 
 The `integration` feature (off by default) pulls `limbic-critic` and `axon-encoder` as git dependencies tracking `Limen-Neural/*` `main`. Most feature-gated code (`src/bridge.rs`, `SpikenautTrainer::train_step_from_critic`) only compiles/tests with `--all-features` or `--features integration` — plain `cargo test` will silently skip it.
 
@@ -46,7 +46,7 @@ Source layout (`src/`):
   - `train_step_from_critic` (integration only) — converts a `limbic_critic::ModulatorVector` via `bridge`, then calls `train_step_with_modulators`
   - `run_session` — snapshots per-neuron thresholds/weights before the batch, replays `train_step` over each `TrainingExample`, and diffs against the snapshot to build `TrainingSummary` (`threshold_drifts`, `weight_drifts`, `per_neuron_spikes`, `avg_reward`)
 - `config.rs` — `TrainingConfig`; always deserializes via `#[serde(default)]` on the struct so partial/old configs stay forward-compatible
-- `bridge.rs` — pure conversions between `limbic_critic::ModulatorVector` and `neuromod::NeuroModulators`. The mapping is positional (`dopamine`/`serotonin`/`acetylcholine`/`norepinephrine` line up 1:1 on current `main` of both crates), not derived from any shared type — re-verify field order after bumping either sibling dependency.
+- `bridge.rs` — `to_neuromodulators`/`from_neuromodulators` are pure conversions between `limbic_critic::ModulatorVector` and `neuromod::NeuroModulators` (positional mapping — `dopamine`/`serotonin`/`acetylcholine`/`norepinephrine` line up 1:1 on current `main` of both crates, not derived from any shared type, so re-verify field order after bumping either sibling dependency). `apply_modulator_vector` is not pure: it takes `&mut SpikingNetwork` and calls `network.step(...)`, so it's the one side-effecting entry point in this module.
 
 Two behavioral details that aren't obvious from the public API alone:
 

@@ -1,0 +1,19 @@
+src/trainer.rs
+  s_cf1b9b53052ba4::t_96147e8540df7c 83-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "2c929477fcd8391781d0074104516769e9a01b65",
+  "prompts": {},
+  "sessions": {
+    "s_cf1b9b53052ba4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "898c9f70-4e15-4793-b11e-3d104d5d883d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

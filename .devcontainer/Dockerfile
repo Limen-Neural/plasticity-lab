@@ -1,4 +1,4 @@
-FROM rust:1.97.1-slim-bookworm
+FROM rust:1.98.1-slim-bookworm
 
 # hadolint ignore=DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends \

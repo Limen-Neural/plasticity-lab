@@ -54,7 +54,7 @@ See also the ownership boundary with [SynapticDistill.jl](#boundary-with-synapti
 
 ### Prerequisites
 
-- Rust 1.97.1 toolchain ([rustup](https://rustup.rs/)) — pinned in `rust-toolchain.toml`
+- Rust 1.98.1 toolchain ([rustup](https://rustup.rs/)) — pinned in `rust-toolchain.toml`
 - A `Cargo.toml` that can pull git dependencies from GitHub
 - Optional: a VS Code Dev Container setup is included under `.devcontainer/`
 

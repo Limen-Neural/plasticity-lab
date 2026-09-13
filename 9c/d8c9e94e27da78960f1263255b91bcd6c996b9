@@ -1,0 +1,19 @@
+.github/workflows/linear-release.yml
+  s_df3dfe062b68b0::t_dac1a54a68badf 8-11,33-36,51,56,59-64
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "9cd8c9e94e27da78960f1263255b91bcd6c996b9",
+  "prompts": {},
+  "sessions": {
+    "s_df3dfe062b68b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "306d353e-7a36-4204-bee9-cb426990a90d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

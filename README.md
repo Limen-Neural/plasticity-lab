@@ -171,15 +171,13 @@ Shape rewards in application code or via [`limbic-critic`](https://github.com/Li
 use plasticity_lab::TrainingConfig;
 
 let config = TrainingConfig {
-    learning_rate: 0.01,
-    target_spikes_per_step: 0.1,
-    homeostasis_strength: 0.001,
-    batch_size: 1,
     use_reward_modulation: true,
 };
 ```
 
-`TrainingConfig::default()` matches the values above. Set `use_reward_modulation: false` to step the network without adjusting neuromodulators from the reward (stimuli still apply). Other fields are knobs for homeostasis / plasticity as the loop grows.
+`TrainingConfig::default()` matches the value above. Set `use_reward_modulation: false` to step the network without adjusting neuromodulators from the reward (stimuli still apply).
+
+`TrainingConfig` only exposes fields that drive an explicit code path in `train_step`. It does not expose a `learning_rate`, homeostasis setpoint, or `batch_size` knob: low-level STDP / homeostasis tuning is owned by `neuromod::SpikingNetwork`, which derives its own learning rate and thresholds from neuromodulator state, and batches are passed directly as `&[TrainingExample]` slices to `run_session` rather than configured. See `CHANGELOG.md` for the migration note if you are upgrading from a config that set those fields.
 
 ## Architecture brief
 
@@ -188,7 +186,7 @@ This section describes **this crate only**. Network dynamics live in [neuromod](
 | Item | Role |
 |------|------|
 | `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step` and `run_session` |
-| `TrainingConfig` | Serializable knobs (learning rate, homeostasis, batch size, reward flag) |
+| `TrainingConfig` | Serializable knobs (currently just the reward-modulation flag) |
 | `TrainingExample` | One sample: `stimuli: Vec<f32>` + `reward: f32` |
 | `TrainingSummary` | Session metrics after `run_session` |
 | `TrainerError` | `EmptyBatch` or wrapped `StepError` from neuromod |

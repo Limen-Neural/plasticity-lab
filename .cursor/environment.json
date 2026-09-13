@@ -2,5 +2,5 @@
     "build": {
         "dockerfile": "Dockerfile"
     },
-    "install": "cargo fetch --locked && cargo build --locked --all-features"
+    "install": "cargo fetch --locked && cargo build --locked --all-features && cargo test --no-run --locked --all-features"
 }

@@ -32,12 +32,15 @@ RUN printf 'export PATH=%s:$PATH\n' "$CARGO_HOME/bin" > /etc/profile.d/cargo.sh 
 
 # Cloud agents run as the `ubuntu` user. Create it (Debian base has no such
 # user), grant passwordless sudo, and hand over the shared Rust toolchain dirs
-# so the agent can build and add components without root.
+# plus the workspace so the agent can build and write target/ without root.
+# Cursor manages the workspace checkout at runtime, but pre-creating /workspace
+# owned by ubuntu avoids a root-owned WORKDIR if the runtime doesn't remap it.
 RUN if ! id -u ubuntu >/dev/null 2>&1; then useradd -m -s /bin/bash ubuntu; fi \
     && usermod -aG sudo ubuntu \
     && echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu \
-    && chown -R ubuntu:ubuntu "$CARGO_HOME" "$RUSTUP_HOME"
+    && mkdir -p /workspace \
+    && chown -R ubuntu:ubuntu "$CARGO_HOME" "$RUSTUP_HOME" /workspace
 
 USER ubuntu
 WORKDIR /workspace

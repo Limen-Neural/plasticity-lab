@@ -26,10 +26,6 @@ All notable changes to this project are documented in this file.
   If you were relying on this crate to pull in `axon-encoder` transitively,
   add it directly to your own `Cargo.toml` instead.
 
-- `rand` and `tracing` are removed from `[dependencies]` (#67, #68): neither
-  had any code in `src/` using them. `serde_json` moves from `[dependencies]`
-  to `[dev-dependencies]`, since it is only used by `config.rs` tests.
-
 - `TrainingConfig::learning_rate`, `TrainingConfig::target_spikes_per_step`,
   `TrainingConfig::homeostasis_strength`, and `TrainingConfig::batch_size` (#66).
   None of these fields were ever read by `SpikenautTrainer` or anything it
@@ -106,6 +102,11 @@ All notable changes to this project are documented in this file.
 ### Removed
 
 - Qodana Cloud scan workflow and `qodana.yaml` (membership expired; Clippy/Codacy remain)
+- `rand` and `tracing` from `[dependencies]` (#67, #68): neither had any code
+  in `src/` using them — not a migration concern for consumers, since nothing
+  in the public API depended on either. `serde_json` moves from
+  `[dependencies]` to `[dev-dependencies]`, since it is only used by
+  `config.rs` tests.
 
 ### Changed
 

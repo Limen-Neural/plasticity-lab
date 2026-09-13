@@ -12,7 +12,10 @@ recorded in the tracking issue. As of this writing:
 - #67, #68 — the dependency/feature cleanup and metadata hygiene are done;
   the git-dependency → crates.io-version conversion stays **explicitly
   deferred** (see [Known limitation](#known-limitation-cargo-package) below)
-- #46, #47 — feature-matrix CI and rustdoc/doctest coverage
+- #47 — rustdoc/doctest coverage, closed
+- #46 — feature-matrix CI; its original PR (#78) merged into a branch that
+  was later squash-merged separately and didn't carry the change through to
+  `main`, so the fix is re-landed as part of this PR instead
 - #44, #45, #49 — closed
 
 ## 2. Run the full validation suite
@@ -20,9 +23,7 @@ recorded in the tracking issue. As of this writing:
 ```bash
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
-cargo test --no-default-features
 cargo test
-cargo test --features critic
 cargo test --all-features
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 cargo deny --locked check
@@ -62,28 +63,36 @@ sibling crates need to be published to crates.io (or otherwise given a
 concrete version) before this crate can be packaged for real.
 
 **Do not work around this by re-pinning to a different mutable git ref, a
-path dependency, or a fake version override** — `REVIEW.md` and `CLAUDE.md`
-both call this out explicitly, and it would just move the dishonesty from
-"can't package" to "packages but the published manifest lies about what it
-resolves to." Wait for the sibling crates, or explicitly re-scope this
-release to depend only on already-published siblings.
+path dependency, or a fake version override.** `CLAUDE.md` says plainly not
+to change the `branch = "main"` git-dependency pinning without discussion,
+and `REVIEW.md`'s reviewer checklist backs that with "No pinned git rev
+changes without discussion." Neither document discusses path dependencies or
+fake version overrides by name, but the same reasoning applies: it would
+just move the dishonesty from "can't package" to "packages, but the
+published manifest lies about what it resolves to." Wait for the sibling
+crates, or explicitly re-scope this release to depend only on
+already-published siblings.
 
-## 6. Tag and publish
+## 6. Publish, then tag
 
-Only after step 5 actually succeeds:
+Only after step 5 actually succeeds, publish **before** tagging — a tag
+pushed before a successful `cargo publish` advertises a version that isn't
+actually installable if publish then fails:
 
 ```bash
+cargo publish
 git tag -s v0.2.0 -m "v0.2.0"
 git push origin v0.2.0
-cargo publish
 ```
 
-Then create a GitHub Release for the tag — publishing it fires
-`.github/workflows/linear-release.yml`, which marks the matching release in
-the [`plasticity-lab` Linear pipeline](https://linear.app/rpd-34/pipeline/plasticity-lab/releases)
-complete. That workflow needs a `LINEAR_ACCESS_KEY` repository secret (a
-release pipeline access key, not a personal API key); see its
-header comment.
+Then create a GitHub Release for the tag. If `.github/workflows/linear-release.yml`
+has landed by then (tracked separately, see #79), publishing the Release
+fires it automatically and marks the matching release in the
+[`plasticity-lab` Linear pipeline](https://linear.app/rpd-34/pipeline/plasticity-lab/releases)
+complete — it needs a `LINEAR_ACCESS_KEY` repository secret (a release
+pipeline access key, not a personal API key; see the workflow's header
+comment). If that workflow hasn't landed yet, mark the Linear release
+complete by hand instead.
 
 ## 7. Verify the published artifact
 

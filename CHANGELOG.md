@@ -58,7 +58,7 @@ All notable changes to this project are documented in this file.
 
 ### Deprecated
 
-- `SpikenautTrainer` remains available as a deprecated alias for `PlasticityTrainer` to ease migration for existing git consumers. It is not part of the documented public API and will be removed in a future release — do not use it in new code.
+- `SpikenautTrainer` remains available as a deprecated alias for `PlasticityTrainer` to ease migration for existing git consumers, at both `plasticity_lab::SpikenautTrainer` and `plasticity_lab::trainer::SpikenautTrainer` (covering both the crate-root re-export and the direct module path). It is hidden from generated rustdoc (`#[doc(hidden)]`) and not part of the documented public API — it will be removed in a future release, so do not use it in new code.
 
 ### Fixed
 

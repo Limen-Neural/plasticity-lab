@@ -70,6 +70,7 @@ pub use bridge::{apply_modulator_vector, from_neuromodulators, to_neuromodulator
 #[deprecated(
     note = "renamed to `PlasticityTrainer`; this alias will be removed in a future release"
 )]
+#[doc(hidden)]
 pub use trainer::PlasticityTrainer as SpikenautTrainer;
 
 #[cfg(test)]

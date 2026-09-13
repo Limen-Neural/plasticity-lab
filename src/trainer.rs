@@ -197,6 +197,17 @@ impl PlasticityTrainer {
     }
 }
 
+/// Deprecated alias for [`PlasticityTrainer`], also reachable via the full module path.
+///
+/// The crate-root alias (`plasticity_lab::SpikenautTrainer`) doesn't cover code that
+/// imports via `plasticity_lab::trainer::SpikenautTrainer` directly — this re-export
+/// closes that gap so both paths keep working during the migration window.
+#[deprecated(
+    note = "renamed to `PlasticityTrainer`; this alias will be removed in a future release"
+)]
+#[doc(hidden)]
+pub use self::PlasticityTrainer as SpikenautTrainer;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -506,5 +517,11 @@ mod tests {
         assert!((network.modulators.serotonin - 0.2).abs() < 1e-5);
         assert!((network.modulators.acetylcholine - 0.4).abs() < 1e-5);
         assert!((network.modulators.norepinephrine - 0.15).abs() < 1e-5);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn spikenaut_trainer_module_path_alias_still_constructs() {
+        let _trainer = super::SpikenautTrainer::new(TrainingConfig::default());
     }
 }

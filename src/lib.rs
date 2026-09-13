@@ -12,10 +12,13 @@
 //!
 //! # Features
 //!
-//! - **default** — core loop only (`neuromod` + serde/tracing/thiserror/rand).
-//! - **`integration`** — optional deps on `limbic-critic` and `axon-encoder`,
-//!   plus the [`bridge`] adapter that converts critic
-//!   [`limbic_critic::ModulatorVector`] into [`neuromod::NeuroModulators`].
+//! - **default** — core loop only (`neuromod` + serde/thiserror).
+//! - **`critic`** — optional dep on `limbic-critic`, plus the `bridge`
+//!   adapter that converts critic `limbic_critic::ModulatorVector` into
+//!   [`neuromod::NeuroModulators`].
+//!
+//! `bridge` and `limbic_critic::ModulatorVector` above are plain code spans,
+//! not doc links: both only exist with the `critic` feature enabled.
 //!
 //! # Quick example
 //!
@@ -33,7 +36,7 @@
 //! assert_eq!(summary.steps_processed, 1);
 //! ```
 //!
-//! # Limbic bridge (`integration`)
+//! # Limbic bridge (`critic`)
 //!
 //! ```rust,ignore
 //! use limbic_critic::SimpleCritic;
@@ -52,13 +55,13 @@
 pub mod config;
 pub mod trainer;
 
-#[cfg(feature = "integration")]
+#[cfg(feature = "critic")]
 pub mod bridge;
 
 pub use config::TrainingConfig;
 pub use trainer::{PlasticityTrainer, TrainerError, TrainingExample, TrainingSummary};
 
-#[cfg(feature = "integration")]
+#[cfg(feature = "critic")]
 pub use bridge::{apply_modulator_vector, from_neuromodulators, to_neuromodulators};
 
 /// Deprecated alias for [`PlasticityTrainer`].

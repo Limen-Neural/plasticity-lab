@@ -7,7 +7,7 @@
 //! [`neuromod::NeuroModulators`] so training loops in this crate can drive
 //! `neuromod`'s reward-modulated STDP without reimplementing it.
 //!
-//! Enabled only with the `integration` feature (optional `limbic-critic` dep).
+//! Enabled only with the `critic` feature (optional `limbic-critic` dep).
 
 use limbic_critic::ModulatorVector;
 use neuromod::{NeuroModulators, SpikingNetwork, StepError};

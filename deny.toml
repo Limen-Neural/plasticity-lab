@@ -7,7 +7,7 @@
 # - [licenses] unlicensed/deny/copyleft/default removed; only allowlist applies.
 
 [graph]
-# Match CI: exercise optional integration deps (limbic-critic, axon-encoder)
+# Match CI: exercise the optional critic-bridge dep (limbic-critic)
 all-features = true
 
 [advisories]
@@ -44,15 +44,12 @@ allow = ["GPL-3.0", "GPL-3.0-or-later"]
 crate = "limbic-critic"
 allow = ["GPL-3.0", "GPL-3.0-or-later"]
 
-[[licenses.exceptions]]
-crate = "axon-encoder"
-allow = ["GPL-3.0", "GPL-3.0-or-later"]
-
 [bans]
 multiple-versions = "warn"
-# Must remain "allow": git+rev deps (neuromod, limbic-critic, axon-encoder) are
-# treated as wildcards by cargo-deny. Concrete crates.io ranges already avoid `*`.
-# Revisit when #16 removes git rev pins.
+# Must remain "allow": git+branch deps (neuromod, limbic-critic) are treated
+# as wildcards by cargo-deny. Concrete crates.io ranges already avoid `*`.
+# Revisit once these sibling crates are published and pinned to registry
+# version ranges (see #67 — deferred: siblings aren't on crates.io yet).
 wildcards = "allow"
 
 [sources]
@@ -62,5 +59,4 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
     "https://github.com/Limen-Neural/neuromod",
     "https://github.com/Limen-Neural/limbic-critic",
-    "https://github.com/Limen-Neural/axon-encoder",
 ]

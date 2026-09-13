@@ -4,26 +4,46 @@ version = "0.1.0"
 edition = "2024"
 description = "Reward-modulated SNN training/session orchestration loop above neuromod's plasticity primitives"
 license = "MIT OR Apache-2.0"
-# Bounded below by the neuromod/axon-encoder git dependencies, which currently require 1.97.1.
+repository = "https://github.com/Limen-Neural/plasticity-lab"
+readme = "README.md"
+keywords = ["snn", "stdp", "plasticity", "neuromodulation", "reward-modulation"]
+categories = ["science", "simulation"]
+# Bounded below by the neuromod git dependency, which currently requires 1.97.1.
 rust-version = "1.98.1"
+# Repo-governance/CI/dev-environment files that a crates.io consumer never
+# needs and that don't belong in the published package artifact (#68).
+exclude = [
+    ".codacy.yml",
+    ".deepsource.toml",
+    ".devcontainer/",
+    ".devin/",
+    ".github/",
+    ".gitignore",
+    "codecov.yml",
+    "rust-toolchain.toml",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "REVIEW.md",
+]
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tracing = "0.1"
 thiserror = "2.0"
-rand = "0.10"
 
 # Git dependencies (track main until crates are published on crates.io).
 # neuromod main uses norepinephrine (not cortisol); limbic-critic main emits
 # ModulatorVector without a neuromod dependency — see src/bridge.rs.
 neuromod = { git = "https://github.com/Limen-Neural/neuromod", branch = "main" }
 limbic-critic = { git = "https://github.com/Limen-Neural/limbic-critic", branch = "main", optional = true }
-axon-encoder = { git = "https://github.com/Limen-Neural/axon-encoder", branch = "main", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"
 
 [features]
 default = []
-integration = ["dep:limbic-critic", "dep:axon-encoder"]
+# Critic → neuromodulator bridge (src/bridge.rs). Named for the concrete
+# capability it enables, not a vague "integration" bundle — see #67.
+critic = ["dep:limbic-critic"]
 
 [workspace]
 

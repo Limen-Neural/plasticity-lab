@@ -16,7 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Docs (denies warnings, matches CI): `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`
 - Coverage: `cargo tarpaulin --all-features --all-targets --out xml --output-dir coverage`
 - License/advisory check: `cargo deny --locked check` (config in `deny.toml`)
-- MSRV build/test — toolchain must match `rust-version` in `Cargo.toml`: `cargo +1.98.1 build --locked --all-features && cargo +1.98.1 test --locked --all-features`
+- MSRV build/test — substitute the exact version pinned in `rust-toolchain.toml` (must match `Cargo.toml`'s `rust-version`): `cargo +<version> build --locked --all-features && cargo +<version> test --locked --all-features`
 
 The toolchain is pinned in `rust-toolchain.toml`. `.github/workflows/ci.yml` runs a `validate` job (fmt, clippy, build, test, docs, tarpaulin coverage) and a separate `msrv` job pinned to an explicit `cargo +<version>` toolchain — bump both `Cargo.toml`'s `rust-version` and every `msrv`/toolchain reference in CI together, never just one.
 

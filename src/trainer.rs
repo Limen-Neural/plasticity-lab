@@ -4,7 +4,7 @@ use crate::config::TrainingConfig;
 use neuromod::{NeuroModulators, SpikingNetwork, StepError};
 use thiserror::Error;
 
-/// Summary metrics collected over a [`SpikenautTrainer::run_session`] call.
+/// Summary metrics collected over a [`PlasticityTrainer::run_session`] call.
 ///
 /// Drifts are relative to network state at the start of the session.
 #[derive(Debug, Default, Clone)]
@@ -53,12 +53,12 @@ pub enum TrainerError {
 /// logic (mining, trading, distillation) does not belong here. For critic-shaped
 /// vectors under the `integration` feature, use [`Self::train_step_from_critic`]
 /// or [`crate::bridge`].
-pub struct SpikenautTrainer {
+pub struct PlasticityTrainer {
     /// Active training configuration.
     pub config: TrainingConfig,
 }
 
-impl SpikenautTrainer {
+impl PlasticityTrainer {
     /// Creates a trainer with the given configuration.
     pub fn new(config: TrainingConfig) -> Self {
         Self { config }
@@ -197,6 +197,17 @@ impl SpikenautTrainer {
     }
 }
 
+/// Deprecated alias for [`PlasticityTrainer`], also reachable via the full module path.
+///
+/// The crate-root alias (`plasticity_lab::SpikenautTrainer`) doesn't cover code that
+/// imports via `plasticity_lab::trainer::SpikenautTrainer` directly — this re-export
+/// closes that gap so both paths keep working during the migration window.
+#[deprecated(
+    note = "renamed to `PlasticityTrainer`; this alias will be removed in a future release"
+)]
+#[doc(hidden)]
+pub use self::PlasticityTrainer as SpikenautTrainer;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -208,7 +219,7 @@ mod tests {
 
     #[test]
     fn train_step_with_reward_modulation_succeeds() {
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let stimuli = vec![0.2; 8];
         let spikes = trainer
@@ -224,9 +235,8 @@ mod tests {
     fn train_step_without_reward_modulation_succeeds() {
         let config = TrainingConfig {
             use_reward_modulation: false,
-            ..TrainingConfig::default()
         };
-        let mut trainer = SpikenautTrainer::new(config);
+        let mut trainer = PlasticityTrainer::new(config);
         let mut network = small_network();
         let stimuli = vec![0.2; 8];
         trainer
@@ -239,7 +249,7 @@ mod tests {
         let mut network = small_network();
         network.modulators.dopamine = 0.4;
         network.modulators.norepinephrine = 0.4;
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         trainer
             .train_step(&mut network, &[0.2; 8], f32::NAN)
             .expect("nan reward must not panic");
@@ -253,7 +263,7 @@ mod tests {
         network.modulators.dopamine = 0.5;
         network.modulators.norepinephrine = 0.5;
 
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         trainer
             .train_step(&mut network, &[0.2; 8], 1.0)
             .expect("train_step");
@@ -268,7 +278,7 @@ mod tests {
         network.modulators.dopamine = 0.5;
         network.modulators.norepinephrine = 0.5;
 
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         trainer
             .train_step(&mut network, &[0.2; 8], -1.0)
             .expect("train_step");
@@ -281,7 +291,7 @@ mod tests {
 
     #[test]
     fn train_step_with_modulators_applies_explicit_state() {
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let mods = NeuroModulators {
             dopamine: 0.9,
@@ -298,7 +308,7 @@ mod tests {
 
     #[test]
     fn run_session_empty_batch_errors() {
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let err = trainer
             .run_session(&mut network, &[])
@@ -308,7 +318,7 @@ mod tests {
 
     #[test]
     fn run_session_reports_steps_and_avg_reward() {
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let batch = vec![
             TrainingExample {
@@ -337,13 +347,13 @@ mod tests {
     fn train_step_is_deterministic_for_subthreshold_stimuli() {
         let stimuli = vec![0.005; 8];
 
-        let mut trainer_a = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer_a = PlasticityTrainer::new(TrainingConfig::default());
         let mut network_a = small_network();
         let spikes_a = trainer_a
             .train_step(&mut network_a, &stimuli, 0.4)
             .expect("step a");
 
-        let mut trainer_b = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer_b = PlasticityTrainer::new(TrainingConfig::default());
         let mut network_b = small_network();
         let spikes_b = trainer_b
             .train_step(&mut network_b, &stimuli, 0.4)
@@ -375,13 +385,13 @@ mod tests {
             },
         ];
 
-        let mut trainer_a = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer_a = PlasticityTrainer::new(TrainingConfig::default());
         let mut network_a = small_network();
         let summary_a = trainer_a
             .run_session(&mut network_a, &batch)
             .expect("session a");
 
-        let mut trainer_b = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer_b = PlasticityTrainer::new(TrainingConfig::default());
         let mut network_b = small_network();
         let summary_b = trainer_b
             .run_session(&mut network_b, &batch)
@@ -397,7 +407,7 @@ mod tests {
 
     #[test]
     fn run_session_summary_shapes_match_network_topology() {
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let batch = vec![
             TrainingExample {
@@ -421,7 +431,7 @@ mod tests {
 
     #[test]
     fn run_session_total_spikes_matches_sum_of_per_neuron_spikes() {
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let batch = vec![
             TrainingExample {
@@ -445,7 +455,7 @@ mod tests {
 
     #[test]
     fn run_session_avg_reward_ignores_nan_but_counts_the_step() {
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let batch = vec![
             TrainingExample {
@@ -469,7 +479,7 @@ mod tests {
 
     #[test]
     fn run_session_avg_reward_defaults_to_zero_when_all_rewards_nan() {
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let batch = vec![
             TrainingExample {
@@ -492,7 +502,7 @@ mod tests {
     fn train_step_from_critic_uses_bridge() {
         use limbic_critic::ModulatorVector;
 
-        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let vector = ModulatorVector {
             dopamine: 0.65,
@@ -507,5 +517,11 @@ mod tests {
         assert!((network.modulators.serotonin - 0.2).abs() < 1e-5);
         assert!((network.modulators.acetylcholine - 0.4).abs() < 1e-5);
         assert!((network.modulators.norepinephrine - 0.15).abs() < 1e-5);
+    }
+
+    #[test]
+    #[allow(deprecated)]
+    fn spikenaut_trainer_module_path_alias_still_constructs() {
+        let _trainer = super::SpikenautTrainer::new(TrainingConfig::default());
     }
 }

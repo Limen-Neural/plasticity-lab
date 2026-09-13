@@ -5,6 +5,10 @@ name: Linear release sync
 # Linear (https://linear.app/rpd-34/pipeline/plasticity-lab/releases)
 # doesn't have to be updated by hand after every publish.
 #
+# Uses Linear's own first-party action (github.com/linear/linear-release-action)
+# rather than hand-rolled GraphQL: it already knows the right mutation shape
+# and auth flow for a scheduled pipeline like this one.
+#
 # Also runnable manually (workflow_dispatch) against a specific tag, so it
 # can be exercised once against a real (or throwaway) release before being
 # trusted to run unattended.
@@ -26,11 +30,10 @@ jobs:
     name: Mark Linear release complete
     runs-on: ubuntu-latest
     steps:
-      # Untrusted values (release tag/name are attacker-controllable by anyone
-      # who can create a GitHub Release or trigger workflow_dispatch) are only
-      # ever passed through `env:` below and read back with "$VAR" — never
-      # interpolated directly into a `run:` script via ${{ }} — to avoid
-      # GitHub Actions script-injection.
+      # Untrusted (a workflow_dispatch tag is caller-supplied) but only ever
+      # passed through `env:` and read back as "$VAR", never interpolated
+      # directly into a `run:` script via ${{ }} — see the repo's other
+      # workflow-injection notes.
       - name: Determine target tag
         id: tag
         env:
@@ -45,79 +48,17 @@ jobs:
             tag="$RELEASE_EVENT_TAG"
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0 # linear-release-action wants commit history available
           persist-credentials: false
 
-      - name: Resolve release facts
-        id: release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          EVENT_NAME: ${{ github.event_name }}
-          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
-          RELEASE_EVENT_NAME: ${{ github.event.release.name }}
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            name=$(gh release view "$RELEASE_TAG" --repo "$REPO" --json name -q '.name // empty')
-          else
-            name="$RELEASE_EVENT_NAME"
-          fi
-          [ -n "$name" ] || name="$RELEASE_TAG"
-
-          version=$(printf '%s' "$RELEASE_TAG" | sed -E 's/^v//')
-          commit_sha=$(git rev-parse HEAD)
-
-          {
-            echo "version=$version"
-            echo "name=$name"
-            echo "commit_sha=$commit_sha"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Call Linear releaseComplete
-        env:
-          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
-          RELEASE_VERSION: ${{ steps.release.outputs.version }}
-          RELEASE_NAME: ${{ steps.release.outputs.name }}
-          RELEASE_COMMIT_SHA: ${{ steps.release.outputs.commit_sha }}
-        run: |
-          set -euo pipefail
-          if [ -z "${LINEAR_API_KEY:-}" ]; then
-            echo "::error::LINEAR_API_KEY repo secret is not set — see this workflow's header comment for setup." >&2
-            exit 1
-          fi
-
-          # Pipeline ID for the "plasticity-lab" release pipeline (not a secret —
-          # Linear internal object ID, stable across renames).
-          # https://linear.app/rpd-34/pipeline/plasticity-lab/releases
-          pipeline_id="97f54908-b560-47ca-aad0-16e1139f03d0"
-
-          payload=$(jq -n \
-            --arg pipelineId "$pipeline_id" \
-            --arg version "$RELEASE_VERSION" \
-            --arg name "$RELEASE_NAME" \
-            --arg commitSha "$RELEASE_COMMIT_SHA" \
-            '{
-              query: "mutation ReleaseComplete($input: ReleaseCompleteInput!) { releaseComplete(input: $input) { success release { id url stage { name } } } }",
-              variables: { input: { pipelineId: $pipelineId, version: $version, name: $name, commitSha: $commitSha } }
-            }')
-
-          response=$(curl -sS -X POST https://api.linear.app/graphql \
-            -H "Content-Type: application/json" \
-            -H "Authorization: ${LINEAR_API_KEY}" \
-            -d "$payload")
-
-          echo "$response" | jq .
-
-          if echo "$response" | jq -e '.errors' > /dev/null; then
-            echo "::error::Linear API returned errors — see output above. If this is 'Cannot query field releaseComplete', the mutation name/shape in this workflow needs to be re-verified against Linear's current GraphQL schema (introspect https://api.linear.app/graphql with your API key)." >&2
-            exit 1
-          fi
-
-          if [ "$(echo "$response" | jq -r '.data.releaseComplete.success')" != "true" ]; then
-            echo "::error::releaseComplete did not report success." >&2
-            exit 1
-          fi
+      - name: Complete the matching Linear release
+        uses: linear/linear-release-action@53ad0f863963e7f8e270fba18426bbb55ef55384 # v0.17.2
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: complete
+          version: ${{ steps.tag.outputs.version }}

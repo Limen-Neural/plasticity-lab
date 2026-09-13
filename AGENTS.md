@@ -29,13 +29,13 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Toolchain
 
-- Rust 2024 edition, pinned to `1.97.1` in `rust-toolchain.toml`
+- Rust 2024 edition, pinned to `1.98.1` in `rust-toolchain.toml`
 - CI uses the same pinned toolchain
 
 ## Dev container
 
 - VS Code Dev Container configuration is in `.devcontainer/`
-- Base image: `rust:1.97.1-slim-bookworm`
+- Base image: `rust:1.98.1-slim-bookworm`
 - `cargo fetch` runs on container creation
 - Run locally with: `devcontainer up --workspace-folder .`
 

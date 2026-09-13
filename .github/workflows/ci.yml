@@ -15,10 +15,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Rust 1.97.1
+      - name: Install Rust 1.98.1
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # pinned action
         with:
-          toolchain: 1.97.1
+          toolchain: 1.98.1
           components: clippy, rustfmt
 
       - name: Cache cargo registry
@@ -103,10 +103,10 @@ jobs:
           persist-credentials: false
 
       # Toolchain version must match package.rust-version in Cargo.toml.
-      - name: Install MSRV toolchain (1.97.1)
+      - name: Install MSRV toolchain (1.98.1)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # pinned action
         with:
-          toolchain: "1.97.1"
+          toolchain: "1.98.1"
 
       - name: Cache cargo registry
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -121,7 +121,7 @@ jobs:
       # Pinned explicitly (not the default/repo-pinned toolchain) so this job keeps
       # testing the declared MSRV even if rust-toolchain.toml advances later.
       - name: Build at MSRV
-        run: cargo +1.97.1 build --locked --all-features
+        run: cargo +1.98.1 build --locked --all-features
 
       - name: Test at MSRV
-        run: cargo +1.97.1 test --locked --all-features
+        run: cargo +1.98.1 test --locked --all-features

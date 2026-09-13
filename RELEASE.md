@@ -81,7 +81,8 @@ cargo publish
 Then create a GitHub Release for the tag — publishing it fires
 `.github/workflows/linear-release.yml`, which marks the matching release in
 the [`plasticity-lab` Linear pipeline](https://linear.app/rpd-34/pipeline/plasticity-lab/releases)
-complete. That workflow needs a `LINEAR_API_KEY` repository secret; see its
+complete. That workflow needs a `LINEAR_ACCESS_KEY` repository secret (a
+release pipeline access key, not a personal API key); see its
 header comment.
 
 ## 7. Verify the published artifact

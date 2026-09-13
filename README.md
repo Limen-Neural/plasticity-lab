@@ -128,6 +128,15 @@ plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", featu
 
 **When to enable `critic`:** you want Cargo to resolve `limbic-critic` alongside this crate and use the `bridge` adapter to turn a `ModulatorVector` into a training step via `train_step_from_critic`/`apply_modulator_vector`. The core trainer API does not require the feature; it always takes precomputed `stimuli: &[f32]` and `reward: f32`.
 
+Exercise the full feature matrix locally (this is also what CI runs, one cell per command):
+
+```bash
+cargo test --no-default-features
+cargo test
+cargo test --features critic
+cargo test --all-features
+```
+
 ## Common patterns
 
 ### Basic reward-modulated session
@@ -312,6 +321,9 @@ Quick local checks:
 ```bash
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
+cargo test --no-default-features
+cargo test
+cargo test --features critic
 cargo test --all-features
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 ```

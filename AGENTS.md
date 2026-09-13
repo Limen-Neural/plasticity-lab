@@ -39,6 +39,13 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 - `cargo fetch` runs on container creation
 - Run locally with: `devcontainer up --workspace-folder .`
 
+## Cursor Cloud specific instructions
+
+- The Cursor cloud-agent environment is defined in `.cursor/environment.json` + `.cursor/Dockerfile` (base image `rust:1.98.1-slim-bookworm`, running as the `ubuntu` user). Both files are force-tracked via a `.gitignore` carve-out; the rest of `.cursor/` stays ignored.
+- The Build's `install` step runs `cargo fetch --locked && cargo build --locked --all-features`, so git dependencies and the all-features build cache are warm before an agent starts.
+- `.cursor/Dockerfile`'s `FROM rust:<version>` hardcodes the toolchain version independently of `rust-toolchain.toml` — bump it alongside the other version-pinned files on any toolchain change (see CLAUDE.md's toolchain-bump checklist).
+- This is a library crate with no binary/server to launch, so there is no `start` command; verify the environment by running the CI checks (`cargo build`/`test`/`clippy`/`fmt`) rather than starting an app.
+
 ## Code style
 
 - Rust 2024 edition

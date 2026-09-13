@@ -1,0 +1,6 @@
+{
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "install": "cargo fetch --locked && cargo build --locked --all-features"
+}

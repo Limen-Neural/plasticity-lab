@@ -22,7 +22,7 @@
 //!
 //! # Quick example
 //!
-//! ```rust,no_run
+//! ```rust
 //! use neuromod::SpikingNetwork;
 //! use plasticity_lab::{PlasticityTrainer, TrainingConfig, TrainingExample};
 //!

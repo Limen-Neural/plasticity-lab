@@ -80,8 +80,9 @@ impl PlasticityTrainer {
     ) -> Result<Vec<usize>, StepError> {
         let mut modulators: NeuroModulators = network.modulators;
 
-        // Skip modulation on NaN: f32::clamp panics on NaN in debug and yields
-        // non-finite modulators that poison subsequent STDP / homeostasis updates.
+        // Skip modulation on NaN: f32::clamp returns NaN unchanged rather than
+        // panicking, so a NaN reward would otherwise propagate silently into
+        // modulators that poison subsequent STDP / homeostasis updates.
         if self.config.use_reward_modulation && !reward.is_nan() {
             // Positive reward shifts toward dopamine; negative toward norepinephrine
             // (stress/arousal). neuromod replaced the former cortisol field with

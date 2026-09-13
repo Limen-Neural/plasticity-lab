@@ -17,12 +17,8 @@
 //!   adapter that converts critic `limbic_critic::ModulatorVector` into
 //!   [`neuromod::NeuroModulators`].
 //!
-//! `bridge`, `limbic_critic::ModulatorVector`, and the other `critic`-only
-//! items referenced above are plain code spans rather than doc links: they
-//! only exist when the `critic` feature is enabled, and an intra-doc link to
-//! a not-currently-compiled item is a broken link under `cargo doc` without
-//! that feature (denied as a warning in CI's `-D warnings` doc build, which
-//! always runs `--all-features` and so never caught this on its own).
+//! `bridge` and `limbic_critic::ModulatorVector` above are plain code spans,
+//! not doc links: both only exist with the `critic` feature enabled.
 //!
 //! # Quick example
 //!

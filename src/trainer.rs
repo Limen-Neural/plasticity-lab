@@ -224,7 +224,6 @@ mod tests {
     fn train_step_without_reward_modulation_succeeds() {
         let config = TrainingConfig {
             use_reward_modulation: false,
-            ..TrainingConfig::default()
         };
         let mut trainer = SpikenautTrainer::new(config);
         let mut network = small_network();

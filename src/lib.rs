@@ -13,9 +13,12 @@
 //! # Features
 //!
 //! - **default** — core loop only (`neuromod` + serde/thiserror).
-//! - **`critic`** — optional dep on `limbic-critic`, plus the [`bridge`]
-//!   adapter that converts critic [`limbic_critic::ModulatorVector`] into
+//! - **`critic`** — optional dep on `limbic-critic`, plus the `bridge`
+//!   adapter that converts critic `limbic_critic::ModulatorVector` into
 //!   [`neuromod::NeuroModulators`].
+//!
+//! `bridge` and `limbic_critic::ModulatorVector` above are plain code spans,
+//! not doc links: both only exist with the `critic` feature enabled.
 //!
 //! # Quick example
 //!

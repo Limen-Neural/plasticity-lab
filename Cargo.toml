@@ -21,6 +21,7 @@ exclude = [
     ".gitignore",
     "codecov.yml",
     "rust-toolchain.toml",
+    "deny.toml",
     "AGENTS.md",
     "CLAUDE.md",
     "REVIEW.md",

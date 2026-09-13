@@ -10,9 +10,14 @@
 .codex/
 .kilo/
 .mimocode/
-.cursor/
 .vscode/
 .opencode/
+
+# Ignore local Cursor IDE state, but keep the cloud agent environment config
+# tracked (mirrors the .devin/blueprint.yaml carve-out below).
+.cursor/*
+!.cursor/environment.json
+!.cursor/Dockerfile
 
 # Coverage output
 coverage/

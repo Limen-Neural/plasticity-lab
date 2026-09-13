@@ -326,6 +326,167 @@ mod tests {
         assert_eq!(summary.threshold_drifts.len(), network.neurons.len());
     }
 
+    // neuromod's `SpikingNetwork::step` only consults its thread-local RNG to
+    // decide, per channel, whether to stamp an input spike time — and only when
+    // `|stimulus| > 0.01` (see engine.rs). Below that magnitude, step() is a pure
+    // function of network state and inputs. There is no seed hook exposed through
+    // this crate (or neuromod) to make the above-threshold path reproducible, so
+    // these tests establish determinism on the sub-threshold path instead.
+
+    #[test]
+    fn train_step_is_deterministic_for_subthreshold_stimuli() {
+        let stimuli = vec![0.005; 8];
+
+        let mut trainer_a = SpikenautTrainer::new(TrainingConfig::default());
+        let mut network_a = small_network();
+        let spikes_a = trainer_a
+            .train_step(&mut network_a, &stimuli, 0.4)
+            .expect("step a");
+
+        let mut trainer_b = SpikenautTrainer::new(TrainingConfig::default());
+        let mut network_b = small_network();
+        let spikes_b = trainer_b
+            .train_step(&mut network_b, &stimuli, 0.4)
+            .expect("step b");
+
+        assert_eq!(spikes_a, spikes_b);
+        assert_eq!(network_a.get_thresholds(), network_b.get_thresholds());
+        assert_eq!(network_a.modulators.dopamine, network_b.modulators.dopamine);
+        assert_eq!(
+            network_a.modulators.norepinephrine,
+            network_b.modulators.norepinephrine
+        );
+    }
+
+    #[test]
+    fn run_session_is_deterministic_for_subthreshold_stimuli() {
+        let batch = vec![
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: 0.3,
+            },
+            TrainingExample {
+                stimuli: vec![-0.008; 8],
+                reward: -0.2,
+            },
+            TrainingExample {
+                stimuli: vec![0.0; 8],
+                reward: 0.0,
+            },
+        ];
+
+        let mut trainer_a = SpikenautTrainer::new(TrainingConfig::default());
+        let mut network_a = small_network();
+        let summary_a = trainer_a
+            .run_session(&mut network_a, &batch)
+            .expect("session a");
+
+        let mut trainer_b = SpikenautTrainer::new(TrainingConfig::default());
+        let mut network_b = small_network();
+        let summary_b = trainer_b
+            .run_session(&mut network_b, &batch)
+            .expect("session b");
+
+        assert_eq!(summary_a.steps_processed, summary_b.steps_processed);
+        assert_eq!(summary_a.total_spikes, summary_b.total_spikes);
+        assert_eq!(summary_a.per_neuron_spikes, summary_b.per_neuron_spikes);
+        assert_eq!(summary_a.threshold_drifts, summary_b.threshold_drifts);
+        assert_eq!(summary_a.weight_drifts, summary_b.weight_drifts);
+        assert_eq!(summary_a.avg_reward, summary_b.avg_reward);
+    }
+
+    #[test]
+    fn run_session_summary_shapes_match_network_topology() {
+        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let batch = vec![
+            TrainingExample {
+                stimuli: vec![0.2; 8],
+                reward: 0.1,
+            },
+            TrainingExample {
+                stimuli: vec![0.3; 8],
+                reward: 0.2,
+            },
+        ];
+        let summary = trainer.run_session(&mut network, &batch).expect("session");
+
+        assert_eq!(summary.per_neuron_spikes.len(), network.neurons.len());
+        assert_eq!(summary.threshold_drifts.len(), network.neurons.len());
+        assert_eq!(summary.weight_drifts.len(), network.neurons.len());
+        for weights in &summary.weight_drifts {
+            assert_eq!(weights.len(), network.num_channels);
+        }
+    }
+
+    #[test]
+    fn run_session_total_spikes_matches_sum_of_per_neuron_spikes() {
+        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let batch = vec![
+            TrainingExample {
+                stimuli: vec![0.5; 8],
+                reward: 0.5,
+            },
+            TrainingExample {
+                stimuli: vec![0.6; 8],
+                reward: -0.4,
+            },
+            TrainingExample {
+                stimuli: vec![0.1; 8],
+                reward: 0.0,
+            },
+        ];
+        let summary = trainer.run_session(&mut network, &batch).expect("session");
+
+        let summed: u64 = summary.per_neuron_spikes.iter().sum();
+        assert_eq!(summary.total_spikes, summed);
+    }
+
+    #[test]
+    fn run_session_avg_reward_ignores_nan_but_counts_the_step() {
+        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let batch = vec![
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: 0.4,
+            },
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: f32::NAN,
+            },
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: 0.2,
+            },
+        ];
+        let summary = trainer.run_session(&mut network, &batch).expect("session");
+
+        assert_eq!(summary.steps_processed, 3);
+        assert!((summary.avg_reward - 0.3).abs() < 1e-5);
+    }
+
+    #[test]
+    fn run_session_avg_reward_defaults_to_zero_when_all_rewards_nan() {
+        let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let batch = vec![
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: f32::NAN,
+            },
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: f32::NAN,
+            },
+        ];
+        let summary = trainer.run_session(&mut network, &batch).expect("session");
+
+        assert_eq!(summary.steps_processed, 2);
+        assert_eq!(summary.avg_reward, 0.0);
+    }
+
     #[cfg(feature = "integration")]
     #[test]
     fn train_step_from_critic_uses_bridge() {

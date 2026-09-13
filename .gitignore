@@ -6,6 +6,7 @@
 *~
 
 # AI/IDE tool directories
+.claude/**/*
 .codex/
 .kilo/
 .mimocode/

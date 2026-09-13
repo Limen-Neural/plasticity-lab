@@ -51,7 +51,7 @@ pub enum TrainerError {
 ///
 /// Applies scalar rewards to neuromodulators and steps the network. Domain-specific
 /// logic (mining, trading, distillation) does not belong here. For critic-shaped
-/// vectors under the `integration` feature, use [`Self::train_step_from_critic`]
+/// vectors under the `critic` feature, use [`Self::train_step_from_critic`]
 /// or [`crate::bridge`].
 pub struct PlasticityTrainer {
     /// Active training configuration.
@@ -104,7 +104,7 @@ impl PlasticityTrainer {
     /// Steps the network with explicit neuromodulators (e.g. from the limbic bridge).
     ///
     /// Does not apply scalar reward shaping; callers that already ran a critic
-    /// should convert via [`crate::to_neuromodulators`] (integration feature) and
+    /// should convert via [`crate::to_neuromodulators`] (`critic` feature) and
     /// pass the result here.
     pub fn train_step_with_modulators(
         &mut self,
@@ -118,7 +118,7 @@ impl PlasticityTrainer {
     /// Steps the network with a critic [`limbic_critic::ModulatorVector`].
     ///
     /// Converts via [`crate::bridge::to_neuromodulators`] then steps. Available only
-    /// with the `integration` feature.
+    /// with the `critic` feature.
     #[cfg(feature = "critic")]
     pub fn train_step_from_critic(
         &mut self,

@@ -315,6 +315,7 @@ For coding agents and human contributors:
 
 - [AGENTS.md](AGENTS.md) — project conventions, setup commands, architecture map, allowed deps
 - [REVIEW.md](REVIEW.md) — PR review checklist and bot-response expectations
+- [RELEASE.md](RELEASE.md) — release preflight checklist and tag/publish process
 
 Quick local checks:
 

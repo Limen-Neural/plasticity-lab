@@ -24,6 +24,7 @@ exclude = [
     "AGENTS.md",
     "CLAUDE.md",
     "REVIEW.md",
+    "RELEASE.md",
 ]
 
 [dependencies]

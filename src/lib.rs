@@ -3,8 +3,8 @@
 //! Generic reward-modulated plasticity loops for spiking neural networks.
 //!
 //! This crate provides a small training loop around [`neuromod::SpikingNetwork`]:
-//! single-step reward modulation via [`SpikenautTrainer::train_step`] and batch
-//! sessions via [`SpikenautTrainer::run_session`].
+//! single-step reward modulation via [`PlasticityTrainer::train_step`] and batch
+//! sessions via [`PlasticityTrainer::run_session`].
 //!
 //! # Features
 //!
@@ -17,9 +17,9 @@
 //!
 //! ```rust,no_run
 //! use neuromod::SpikingNetwork;
-//! use plasticity_lab::{SpikenautTrainer, TrainingConfig, TrainingExample};
+//! use plasticity_lab::{PlasticityTrainer, TrainingConfig, TrainingExample};
 //!
-//! let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+//! let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
 //! let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
 //! let batch = vec![TrainingExample {
 //!     stimuli: vec![0.25; 64],
@@ -49,7 +49,30 @@ pub mod trainer;
 pub mod bridge;
 
 pub use config::TrainingConfig;
-pub use trainer::{SpikenautTrainer, TrainerError, TrainingExample, TrainingSummary};
+pub use trainer::{PlasticityTrainer, TrainerError, TrainingExample, TrainingSummary};
 
 #[cfg(feature = "integration")]
 pub use bridge::{apply_modulator_vector, from_neuromodulators, to_neuromodulators};
+
+/// Deprecated alias for [`PlasticityTrainer`].
+///
+/// This crate is pre-1.0 and consumed via git dependency, so this alias exists only
+/// as a short-lived migration aid for existing consumers. It is **not** part of the
+/// documented public API: new code must use [`PlasticityTrainer`] directly, and this
+/// alias will be removed in a future release.
+#[deprecated(
+    note = "renamed to `PlasticityTrainer`; this alias will be removed in a future release"
+)]
+pub use trainer::PlasticityTrainer as SpikenautTrainer;
+
+#[cfg(test)]
+mod deprecated_alias_tests {
+    #![allow(deprecated)]
+
+    use super::{SpikenautTrainer, TrainingConfig};
+
+    #[test]
+    fn spikenaut_trainer_alias_still_constructs() {
+        let _trainer = SpikenautTrainer::new(TrainingConfig::default());
+    }
+}

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-/// Configuration knobs for [`crate::SpikenautTrainer`].
+/// Configuration knobs for [`crate::PlasticityTrainer`].
 ///
 /// Values are serializable (serde) so they can be stored with checkpoints or
 /// experiment configs. Defaults match a light reward-modulated loop; adjust as

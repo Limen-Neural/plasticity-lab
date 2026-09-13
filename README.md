@@ -72,10 +72,10 @@ Pin `rev` values to match this crate’s `Cargo.toml` if you need a locked ecosy
 
 ```rust
 use neuromod::SpikingNetwork;
-use plasticity_lab::{SpikenautTrainer, TrainingConfig, TrainingExample};
+use plasticity_lab::{PlasticityTrainer, TrainingConfig, TrainingExample};
 
 fn main() {
-    let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
     let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
 
     let batch = vec![
@@ -138,10 +138,10 @@ Drive the network yourself when rewards are online or adaptive:
 
 ```rust
 use neuromod::{SpikingNetwork, StepError};
-use plasticity_lab::{SpikenautTrainer, TrainingConfig};
+use plasticity_lab::{PlasticityTrainer, TrainingConfig};
 
 fn main() -> Result<(), StepError> {
-    let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
     let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
 
     let stimuli = vec![0.3; 64];
@@ -187,7 +187,7 @@ This section describes **this crate only**. Network dynamics live in [neuromod](
 
 | Item | Role |
 |------|------|
-| `SpikenautTrainer` | Holds `TrainingConfig`; owns `train_step` and `run_session` |
+| `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step` and `run_session` |
 | `TrainingConfig` | Serializable knobs (learning rate, homeostasis, batch size, reward flag) |
 | `TrainingExample` | One sample: `stimuli: Vec<f32>` + `reward: f32` |
 | `TrainingSummary` | Session metrics after `run_session` |
@@ -236,7 +236,7 @@ This crate provides generic reward-modulated plasticity loops for spiking neural
 ### Does Not Own
 - Domain-specific training logic (mining, trading, etc.)
 - Differentiable or online distillation and teacher-student knowledge transfer
-- Additional project-specific trainer type names beyond the public `SpikenautTrainer` API
+- Additional project-specific trainer type names beyond the public `PlasticityTrainer` API
 
 ### Boundary with SynapticDistill.jl (Linear LIM-25)
 - `plasticity-lab` (Rust): reward-modulated STDP / Hebbian plasticity rules and online low-level weight delta computation.

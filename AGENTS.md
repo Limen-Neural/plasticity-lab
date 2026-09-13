@@ -49,7 +49,7 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Architecture
 
-- `src/trainer.rs` — core training loop (`SpikenautTrainer`, `run_session`)
+- `src/trainer.rs` — core training loop (`PlasticityTrainer`, `run_session`)
 - `src/config.rs` — configuration (`TrainingConfig`)
 - `src/lib.rs` — public API re-exports
 - `plasticity-lab` owns training loops and plasticity rules only

@@ -296,9 +296,9 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 |----------|--------|--------|
 | **Rust** | Supported | This crate; use [Getting started](#getting-started) |
 | **Julia** | Sister project | Distillation only in [SynapticDistill.jl](https://github.com/Limen-Neural/SynapticDistill.jl) — not a binding of this crate |
-| **Python** | Planned | Bindings tracked in issue [#13](https://github.com/Limen-Neural/plasticity-lab/issues/13); **not yet shipped** |
+| **Python** | Not planned | No PyO3/maturin bindings exist; tracking issue [#13](https://github.com/Limen-Neural/plasticity-lab/issues/13) was closed as a duplicate without being implemented |
 
-Do not expect a Python package from this repository today. When #13 lands, this README will add a parallel getting-started path.
+Do not expect a Python package from this repository. There is currently no active plan or open issue tracking Python bindings; if that changes, this README will add a parallel getting-started path.
 
 ## Contributing
 

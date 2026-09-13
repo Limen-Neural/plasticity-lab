@@ -1,0 +1,56 @@
+src/lib.rs
+  s_df3dfe062b68b0::t_33ab9e22956c60 15-18
+  s_df3dfe062b68b0::t_cd04572e59a866 36
+  s_df3dfe062b68b0::t_676b362bb5a631 55,61
+CLAUDE.md
+  s_df3dfe062b68b0::t_63c717be1f5cee 23
+  s_df3dfe062b68b0::t_26dc3609a99816 36-37,42,46
+  s_df3dfe062b68b0::t_618c7f6e2a6ba5 58
+README.md
+  s_df3dfe062b68b0::t_6d9319b0a9f7e3 27
+  s_df3dfe062b68b0::t_b635e172c079da 40
+  s_df3dfe062b68b0::t_b90576ffe0c520 239
+  s_df3dfe062b68b0::t_85e5484e8b6bd7 110,116-117,123-124,127,129
+  s_df3dfe062b68b0::t_1df468896ad3a3 263
+  s_df3dfe062b68b0::t_4216e20afaa0be 47,50
+  s_df3dfe062b68b0::t_1cb386b934e6e3 253
+  s_df3dfe062b68b0::t_65b5362ce75dc1 281,284
+  s_df3dfe062b68b0::t_d6bb56dea463b0 164
+deny.toml
+  s_df3dfe062b68b0::t_cd27144d11eb0a 49-52
+  s_df3dfe062b68b0::t_226c0a4f7ffff4 10
+Cargo.toml
+  s_df3dfe062b68b0::t_9ff19fec027a98 7-10
+  s_df3dfe062b68b0::t_5a6c8d80329bb4 13-27
+  s_df3dfe062b68b0::t_94ba6dea9253bb 38-40,44-46
+  s_df3dfe062b68b0::t_2ebac9a9c8e149 11
+src/trainer.rs
+  s_df3dfe062b68b0::t_842fe48aca09a2 122,501
+AGENTS.md
+  s_df3dfe062b68b0::t_c8f25d53ae85c5 48
+  s_df3dfe062b68b0::t_4af280a1a3d646 86-89
+  s_df3dfe062b68b0::t_5ed237398654d5 18-19
+  s_df3dfe062b68b0::t_1f36605ca545ae 54,59
+  s_df3dfe062b68b0::t_b1e2a102a06be2 73-75
+CHANGELOG.md
+  s_df3dfe062b68b0::t_9998d39234c31f 76,78,82-94
+  s_df3dfe062b68b0::t_7c575065ba8c54 9-32
+Cargo.lock
+  ai_agent 154,198
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "448341f9cbe9626911c8bc60bc8c0650c8f41c0b",
+  "prompts": {},
+  "sessions": {
+    "s_df3dfe062b68b0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "306d353e-7a36-4204-bee9-cb426990a90d",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

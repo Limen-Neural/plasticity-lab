@@ -63,7 +63,16 @@ jobs:
       - name: Build
         run: cargo build --all-features
 
-      - name: Test
+      - name: Test (no default features)
+        run: cargo test --no-default-features
+
+      - name: Test (default features)
+        run: cargo test
+
+      - name: Test (critic feature)
+        run: cargo test --features critic
+
+      - name: Test (all features)
         run: cargo test --all-features
 
       - name: Docs

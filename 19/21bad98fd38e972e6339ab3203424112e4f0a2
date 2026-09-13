@@ -1,0 +1,19 @@
+CLAUDE.md
+  s_1ce20f33cf2fa3::t_13bc32daed593b 54
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "1921bad98fd38e972e6339ab3203424112e4f0a2",
+  "prompts": {},
+  "sessions": {
+    "s_1ce20f33cf2fa3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b3ab31ce-3bbe-4e87-8441-96519aead338",
+        "model": "claude-sonnet-5"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

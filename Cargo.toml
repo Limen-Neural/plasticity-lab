@@ -28,6 +28,12 @@ exclude = [
     "RELEASE.md",
 ]
 
+# docs.rs does not enable optional features by default; without this, the
+# `critic` feature's `bridge` module would be silently missing from the
+# published docs.
+[package.metadata.docs.rs]
+all-features = true
+
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"

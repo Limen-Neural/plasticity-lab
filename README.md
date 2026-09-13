@@ -312,9 +312,12 @@ Do not expect a Python package from this repository. There is currently no activ
 
 For coding agents and human contributors:
 
-- [AGENTS.md](AGENTS.md) — project conventions, setup commands, architecture map, allowed deps
-- [REVIEW.md](REVIEW.md) — PR review checklist and bot-response expectations
-- [RELEASE.md](RELEASE.md) — release preflight checklist and tag/publish process
+- [AGENTS.md](https://github.com/Limen-Neural/plasticity-lab/blob/main/AGENTS.md) — project conventions, setup commands, architecture map, allowed deps
+- [REVIEW.md](https://github.com/Limen-Neural/plasticity-lab/blob/main/REVIEW.md) — PR review checklist and bot-response expectations
+- [RELEASE.md](https://github.com/Limen-Neural/plasticity-lab/blob/main/RELEASE.md) — release preflight checklist and tag/publish process
+
+(Absolute links: these files are excluded from the packaged crate, so a
+relative link would be dead when README is read from crates.io/docs.rs.)
 
 Quick local checks:
 

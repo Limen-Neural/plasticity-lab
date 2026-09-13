@@ -44,7 +44,15 @@ fresh empty `[Unreleased]` section above it.
 Set `version` in `Cargo.toml` to `0.2.0`, then run `cargo build` once to
 update `Cargo.lock`'s own package entry.
 
-## 5. Package validation
+## 5. Commit the release edits
+
+Commit the `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock` changes from steps
+3–4. `cargo package` refuses a dirty working directory without
+`--allow-dirty` — which this checklist does not use, since packaging
+uncommitted state would let the signed tag in step 7 point at a commit that
+doesn't match what was actually packaged/published.
+
+## 6. Package validation
 
 ```bash
 cargo package --list   # manually review — should list only release-relevant files
@@ -73,9 +81,9 @@ published manifest lies about what it resolves to." Wait for the sibling
 crates, or explicitly re-scope this release to depend only on
 already-published siblings.
 
-## 6. Publish, then tag
+## 7. Publish, then tag
 
-Only after step 5 actually succeeds, publish **before** tagging — a tag
+Only after step 6 actually succeeds, publish **before** tagging — a tag
 pushed before a successful `cargo publish` advertises a version that isn't
 actually installable if publish then fails:
 
@@ -94,11 +102,13 @@ pipeline access key, not a personal API key; see the workflow's header
 comment). If that workflow hasn't landed yet, mark the Linear release
 complete by hand instead.
 
-## 7. Verify the published artifact
+## 8. Verify the published artifact
 
 - Check the crate page renders correctly on crates.io
-- Check docs.rs built the `critic`-feature docs (docs.rs builds with
-  `--all-features` by default, but confirm)
+- Check docs.rs actually built the `critic`-feature docs. `Cargo.toml`'s
+  `[package.metadata.docs.rs] all-features = true` should make this happen
+  automatically — docs.rs does **not** enable optional features by default
+  on its own — but verify the built site, don't just trust the config
 - In a scratch directory, `cargo new` + add `plasticity-lab = "0.2.0"` and
   confirm it builds against the registry, independent of this repository's
   checkout

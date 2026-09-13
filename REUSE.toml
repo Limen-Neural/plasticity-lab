@@ -21,7 +21,6 @@ path = [
     "Cargo.toml",
     "Cargo.lock",
     "codecov.yml",
-    "qodana.yaml",
     ".codacy.yml",
     ".gitignore",
 ]

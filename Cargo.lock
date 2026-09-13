@@ -63,7 +63,7 @@ checksum = "a7743783ea728ef5c31194c6590797eed286449b4a4e87d626d8a51f0a94e732"
 [[package]]
 name = "limbic-critic"
 version = "0.2.0"
-source = "git+https://github.com/Limen-Neural/limbic-critic?branch=main#103e85c184fa64be91828a6a712ad2c8cdedeafb"
+source = "git+https://github.com/Limen-Neural/limbic-critic?branch=main#aa09665f03bc08a17767166a372f98f90e3f9e9b"
 
 [[package]]
 name = "memchr"

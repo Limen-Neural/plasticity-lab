@@ -49,16 +49,23 @@ update `Cargo.lock`'s own package entry.
 Commit the `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock` changes from steps
 3–4. `cargo package` refuses a dirty working directory without
 `--allow-dirty` — which this checklist does not use, since packaging
-uncommitted state would let the signed tag in step 7 point at a commit that
+uncommitted state would let the signed tag in step 8 point at a commit that
 doesn't match what was actually packaged/published.
 
 ## 6. Package validation
 
 ```bash
-cargo package --list   # manually review — should list only release-relevant files
-cargo package
-cargo publish --dry-run
+cargo package --list --all-features   # manually review — should list only release-relevant files
+cargo package --all-features
+cargo publish --dry-run --all-features
 ```
+
+`--all-features` matters here specifically: without it, `cargo package`'s
+build-verification step only compiles the default feature set, so a
+registry-resolved `limbic-critic` version that's actually incompatible with
+the `critic` feature's code would pass this check and only surface once
+docs.rs (or a consumer) builds with all features against the immutable
+published version.
 
 ### Known limitation: these currently fail
 
@@ -83,19 +90,40 @@ already-published siblings.
 
 **Once `neuromod` and `limbic-critic` are actually published, this doesn't
 resolve itself** — publishing them doesn't change this crate's `Cargo.toml`.
-Before rerunning `cargo package`/`cargo publish --dry-run`, edit both
-dependency entries in `Cargo.toml` to add a concrete crates.io version
-requirement (e.g. `neuromod = { version = "0.x", git = "...", branch =
-"main" }`, keeping the git source for as long as this repo still tracks
-`main` rather than a released version — or drop the git source entirely once
-that tracking is no longer needed), then re-run step 2's validation suite
-before returning here.
+Before rerunning `cargo package`/`cargo publish --dry-run`:
 
-## 7. Publish, then tag
+1. Edit both dependency entries in `Cargo.toml` to add a concrete
+   crates.io version requirement matching each sibling's actual published
+   version — a full version like `neuromod = { version = "0.7.0", git =
+   "...", branch = "main" }`, not a bare major digit or a placeholder like
+   `"0.x"`: Cargo treats a major-only requirement (`"0"`) as
+   `>=0.0.0, <1.0.0`, which would let a later semver-breaking 0.y release
+   satisfy the dependency instead of pinning to what was actually
+   validated. Keep the git source for as long as this repo still tracks
+   `main` rather than a released version, or drop it entirely once that
+   tracking is no longer needed.
+2. Re-run step 2's validation suite against the edited manifest.
+3. Commit the updated `Cargo.toml` and any resulting `Cargo.lock` changes.
+4. Only then return to step 6 — `cargo package` refuses a dirty working
+   directory (without `--allow-dirty`, which this checklist doesn't use)
+   the same way step 5 does.
 
-Only after step 6 actually succeeds, publish **before** tagging — a tag
-pushed before a successful `cargo publish` advertises a version that isn't
-actually installable if publish then fails:
+## 7. Land the release commit on `main`
+
+Only after step 6 actually succeeds. The commit from step 5 (and any
+`Cargo.toml`/`Cargo.lock` follow-up from step 6's known-limitation path) must
+actually be on `origin/main` before tagging it — pushing a tag alone
+(`git push origin v0.2.0`) only transfers the tag object, not the commit
+history behind it, per this repo's own convention that PRs target `main`
+(see `AGENTS.md`). Open a PR for the release commit and merge it, or push
+`main` directly if that's this repo's practice for release commits, then
+`git checkout main && git pull` before continuing.
+
+## 8. Publish, then tag
+
+Publish **before** tagging — a tag pushed before a successful
+`cargo publish` advertises a version that isn't actually installable if
+publish then fails:
 
 ```bash
 cargo publish
@@ -112,7 +140,7 @@ pipeline access key, not a personal API key; see the workflow's header
 comment). If that workflow hasn't landed yet, mark the Linear release
 complete by hand instead.
 
-## 8. Verify the published artifact
+## 9. Verify the published artifact
 
 - Check the crate page renders correctly on crates.io
 - Check docs.rs actually built the `critic`-feature docs. `Cargo.toml`'s

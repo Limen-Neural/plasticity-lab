@@ -51,7 +51,7 @@ Source layout (`src/`):
 Two behavioral details that aren't obvious from the public API alone:
 
 - Of `TrainingConfig`'s five fields, only `use_reward_modulation` is actually read by `trainer.rs`. `learning_rate`, `target_spikes_per_step`, `homeostasis_strength`, and `batch_size` are not wired into any code path yet — don't assume setting them changes training behavior (tracked in issue #66).
-- `train_step`'s reward→modulator shift is asymmetric and NaN-guarded: positive reward moves dopamine/norepinephrine by different coefficients (0.1/0.05) than negative reward does (0.1/0.2), all clamped to `[0.0, 1.0]`; `reward.is_nan()` skips modulation entirely instead of letting NaN reach `clamp` (which panics in debug builds).
+- `train_step`'s reward→modulator shift is asymmetric and NaN-guarded: positive reward moves dopamine/norepinephrine by different coefficients (0.1/0.05) than negative reward does (0.1/0.2), all clamped to `[0.0, 1.0]`; `reward.is_nan()` skips modulation entirely because `clamp` doesn't protect against this — a NaN receiver passes straight through unclamped (`NaN.clamp(0.0, 1.0)` is `NaN`, not a panic), which would otherwise poison the modulator state for every subsequent step.
 
 ## Ecosystem/ownership boundaries
 

@@ -11,13 +11,13 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Ecosystem
 
-| Crate               | Role                                        | Language |
-|----------------------|---------------------------------------------|----------|
-| `neuromod`           | Core SNN + neuromodulator types             | Rust     |
-| `plasticity-lab`     | Training loops + plasticity rules           | Rust     |
-| `limbic-critic`      | Reward shaping                              | Rust     |
-| `axon-encoder`       | Input encoding                              | Rust     |
-| `SynapticDistill.jl` | Distillation / knowledge transfer           | Julia    |
+| Crate               | Role                                                                    | Language |
+|----------------------|--------------------------------------------------------------------------|----------|
+| `neuromod`           | Core SNN dynamics, neuromodulator types, foundational (classical + reward-modulated) STDP primitives | Rust |
+| `plasticity-lab`     | Training/session orchestration above `neuromod` (this crate)           | Rust     |
+| `limbic-critic`      | Reward shaping                                                          | Rust     |
+| `axon-encoder`       | Input encoding                                                          | Rust     |
+| `SynapticDistill.jl` | Distillation / knowledge transfer                                       | Julia    |
 
 ## Setup commands
 
@@ -49,10 +49,12 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Architecture
 
-- `src/trainer.rs` — core training loop (`SpikenautTrainer`, `run_session`)
+- `src/trainer.rs` — core training loop (`PlasticityTrainer`, `run_session`)
 - `src/config.rs` — configuration (`TrainingConfig`)
+- `src/bridge.rs` — integration adapters between `limbic-critic` and `neuromod` types (`integration` feature)
 - `src/lib.rs` — public API re-exports
-- `plasticity-lab` owns training loops and plasticity rules only
+- `plasticity-lab` owns SNN learning/training orchestration only — see the README's [Scope and ownership boundaries](README.md#scope-and-ownership-boundaries)
+- Neuron/network dynamics, neuromodulator state, and foundational (classical + reward-modulated) STDP primitives belong in `neuromod` — call/configure them through its public API rather than reimplementing them here
 - Reward shaping belongs in `limbic-critic`
 - Input encoding belongs in `axon-encoder`
 
@@ -60,6 +62,8 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 - Do not add domain-specific training logic (mining, trading, etc.)
 - Do not add distillation or teacher-student transfer (belongs in `SynapticDistill.jl`)
+- Do not implement or duplicate STDP / reward-modulated STDP primitives here — those belong in `neuromod`; call/configure them through its public API
+- Do not claim checkpointing or model serialization support unless it is actually implemented in `src/`
 - Do not add `unsafe` code
 - Do not add heavy or framework-specific dependencies
 

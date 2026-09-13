@@ -2,7 +2,7 @@
 
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
 
-Generic reward-modulated plasticity loops for spiking neural networks.
+Reusable SNN learning/training orchestration layer: reward-modulated training loops above [`neuromod`](https://github.com/Limen-Neural/neuromod)'s plasticity primitives.
 
 ## Table of contents
 
@@ -19,12 +19,14 @@ Generic reward-modulated plasticity loops for spiking neural networks.
 
 ## Overview
 
-`plasticity-lab` provides a small, reusable training loop around [`neuromod::SpikingNetwork`](https://github.com/Limen-Neural/neuromod).
+`plasticity-lab` is the reusable **SNN learning/training orchestration layer** for the Limen-Neural stack. It provides a small training loop around [`neuromod::SpikingNetwork`](https://github.com/Limen-Neural/neuromod) — the crate that owns neuron/network dynamics, neuromodulator state, and the foundational classical and reward-modulated STDP primitives. `plasticity-lab` calls and configures those primitives through `neuromod`'s public API; it does not reimplement them.
+
 It is intentionally domain-agnostic:
 
+- Neuron/network dynamics and low-level plasticity primitives (STDP, R-STDP) belong to [`neuromod`](https://github.com/Limen-Neural/neuromod)
 - Input encoding belongs to [`axon-encoder`](https://github.com/Limen-Neural/axon-encoder)
 - Reward shaping belongs to [`limbic-critic`](https://github.com/Limen-Neural/limbic-critic)
-- This crate runs the loop and tracks training summaries
+- This crate orchestrates the training/session loop, maps rewards or modulator vectors into training steps, and tracks training summaries
 
 If you are new to the Limen-Neural stack, start with [Getting started](#getting-started), then skim [Ecosystem overview](#ecosystem-overview) and [Scope and ownership boundaries](#scope-and-ownership-boundaries) so you know which crate owns which piece.
 
@@ -32,8 +34,8 @@ If you are new to the Limen-Neural stack, start with [Getting started](#getting-
 
 | Crate | Role | Language | When to use it |
 |-------|------|----------|----------------|
-| **plasticity-lab** (this crate) | Training loops + plasticity rules (`train_step`, `run_session`) | Rust | You need a reward-modulated SNN training loop and session metrics |
-| [neuromod](https://github.com/Limen-Neural/neuromod) | Core SNN + neuromodulator types (`SpikingNetwork`, `NeuroModulators`) | Rust | You need the network, step dynamics, or modulator state |
+| **plasticity-lab** (this crate) | Training/session orchestration (`train_step`, `run_session`) | Rust | You need a reward-modulated SNN training loop and session metrics |
+| [neuromod](https://github.com/Limen-Neural/neuromod) | Core SNN dynamics, neuromodulator types, and foundational (classical + reward-modulated) STDP primitives (`SpikingNetwork`, `NeuroModulators`) | Rust | You need the network, step dynamics, modulator state, or the underlying plasticity rules |
 | [limbic-critic](https://github.com/Limen-Neural/limbic-critic) | Reward shaping | Rust | You need shaped / multi-signal rewards instead of raw scalars |
 | [axon-encoder](https://github.com/Limen-Neural/axon-encoder) | Input encoding | Rust | You need to turn raw features into spike stimuli |
 | [SynapticDistill.jl](https://github.com/Limen-Neural/SynapticDistill.jl) | Distillation / knowledge transfer | **Julia only** | Teacher–student or differentiable distillation — not STDP |
@@ -72,10 +74,10 @@ Pin `rev` values to match this crate’s `Cargo.toml` if you need a locked ecosy
 
 ```rust
 use neuromod::SpikingNetwork;
-use plasticity_lab::{SpikenautTrainer, TrainingConfig, TrainingExample};
+use plasticity_lab::{PlasticityTrainer, TrainingConfig, TrainingExample};
 
 fn main() {
-    let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
     let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
 
     let batch = vec![
@@ -138,10 +140,10 @@ Drive the network yourself when rewards are online or adaptive:
 
 ```rust
 use neuromod::{SpikingNetwork, StepError};
-use plasticity_lab::{SpikenautTrainer, TrainingConfig};
+use plasticity_lab::{PlasticityTrainer, TrainingConfig};
 
 fn main() -> Result<(), StepError> {
-    let mut trainer = SpikenautTrainer::new(TrainingConfig::default());
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
     let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
 
     let stimuli = vec![0.3; 64];
@@ -171,24 +173,22 @@ Shape rewards in application code or via [`limbic-critic`](https://github.com/Li
 use plasticity_lab::TrainingConfig;
 
 let config = TrainingConfig {
-    learning_rate: 0.01,
-    target_spikes_per_step: 0.1,
-    homeostasis_strength: 0.001,
-    batch_size: 1,
     use_reward_modulation: true,
 };
 ```
 
-`TrainingConfig::default()` matches the values above. Set `use_reward_modulation: false` to step the network without adjusting neuromodulators from the reward (stimuli still apply). Other fields are knobs for homeostasis / plasticity as the loop grows.
+`TrainingConfig::default()` matches the value above. Set `use_reward_modulation: false` to step the network without adjusting neuromodulators from the reward (stimuli still apply).
+
+`TrainingConfig` only exposes fields that drive an explicit code path in `train_step`. It does not expose a `learning_rate`, homeostasis setpoint, or `batch_size` knob: low-level STDP / homeostasis tuning is owned by `neuromod::SpikingNetwork`, which derives its own learning rate and thresholds from neuromodulator state, and batches are passed directly as `&[TrainingExample]` slices to `run_session` rather than configured. See `CHANGELOG.md` for the migration note if you are upgrading from a config that set those fields.
 
 ## Architecture brief
 
-This section describes **this crate only**. Network dynamics live in [neuromod](https://github.com/Limen-Neural/neuromod).
+This section describes **this crate only**. Network dynamics, neuromodulator state, and the underlying classical / reward-modulated STDP primitives live in [neuromod](https://github.com/Limen-Neural/neuromod) — see its own ownership documentation ([neuromod#readme](https://github.com/Limen-Neural/neuromod#scope-and-ownership-boundaries)) for that crate's boundary commitments.
 
 | Item | Role |
 |------|------|
-| `SpikenautTrainer` | Holds `TrainingConfig`; owns `train_step` and `run_session` |
-| `TrainingConfig` | Serializable knobs (learning rate, homeostasis, batch size, reward flag) |
+| `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step` and `run_session` |
+| `TrainingConfig` | Serializable knobs (currently just the reward-modulation flag) |
 | `TrainingExample` | One sample: `stimuli: Vec<f32>` + `reward: f32` |
 | `TrainingSummary` | Session metrics after `run_session` |
 | `TrainerError` | `EmptyBatch` or wrapped `StepError` from neuromod |
@@ -224,28 +224,60 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 
 ## Scope and ownership boundaries
 
-This crate provides generic reward-modulated plasticity loops for spiking neural networks. It is intentionally domain-agnostic.
+`plasticity-lab` is the reusable **SNN learning/training orchestration layer** above the low-level plasticity primitives in [`neuromod`](https://github.com/Limen-Neural/neuromod). It is intentionally domain-agnostic, and it does not reimplement plasticity algorithms that `neuromod` already owns.
+
+### Layering
+
+```text
+        application / supervisor
+                  │
+                  │  drives experiments, reads TrainingSummary
+                  ▼
+             plasticity-lab   (this crate)
+                  │  training/session orchestration: train_step,
+                  │  run_session, reward/modulator-vector mapping,
+                  │  batches, metrics, integration adapters
+                  ▼
+                neuromod
+                   SpikingNetwork, neuron/network dynamics,
+                   neuromodulator state, foundational classical
+                   and reward-modulated STDP primitives
+```
 
 ### Owns
-- SNN training loop abstractions
-- Plasticity rule implementations (STDP, R-STDP, etc.)
-- Integration with `limbic-critic` for reward shaping
-- Training progress tracking and metrics
-- Checkpointing and model serialization
+- Training/session orchestration (`train_step`, `run_session`)
+- Mapping externally supplied scalar rewards or modulator vectors (e.g. from `limbic-critic`) into a training step
+- Training examples / batches (`TrainingExample`)
+- Progress and training summaries (`TrainingSummary`)
+- Training/session metrics and invariants (spike counts, threshold/weight drift, empty-batch rejection)
+- Integration adapters between independently owned crates (the `bridge` module)
+- Checkpoint/session orchestration, if/when it is actually implemented — **not implemented today** (see [Does Not Own](#does-not-own))
 
 ### Does Not Own
+- Neuron and network dynamics, and `SpikingNetwork` itself — owned by [`neuromod`](https://github.com/Limen-Neural/neuromod)
+- Neuromodulator state/types — owned by `neuromod`
+- Foundational classical STDP primitives — owned by `neuromod`
+- Foundational reward-modulated STDP / eligibility-trace primitives — owned by `neuromod`
+- Low-level plasticity configuration applied by the network engine — owned by `neuromod`
+- Reward shaping — owned by [`limbic-critic`](https://github.com/Limen-Neural/limbic-critic)
+- Input encoding — owned by [`axon-encoder`](https://github.com/Limen-Neural/axon-encoder)
+- Differentiable or online distillation and teacher-student knowledge transfer — owned by [`SynapticDistill.jl`](https://github.com/Limen-Neural/SynapticDistill.jl)
 - Domain-specific training logic (mining, trading, etc.)
-- Differentiable or online distillation and teacher-student knowledge transfer
-- Additional project-specific trainer type names beyond the public `SpikenautTrainer` API
+- Checkpointing and model serialization — **not currently implemented** in this crate; do not assume it exists
+- Additional project-specific trainer type names beyond the public `PlasticityTrainer` API
+
+### Boundary with neuromod
+
+`plasticity-lab` calls and configures `neuromod`'s plasticity rules through its public API (`SpikingNetwork::step`, `NeuroModulators`) rather than copying the algorithms here. Changes to how STDP or reward-modulated STDP behaves belong in `neuromod`, not in this crate. See [neuromod's own ownership documentation](https://github.com/Limen-Neural/neuromod#scope-and-ownership-boundaries) for its boundary commitments.
 
 ### Boundary with SynapticDistill.jl (Linear LIM-25)
-- `plasticity-lab` (Rust): reward-modulated STDP / Hebbian plasticity rules and online low-level weight delta computation.
+- `plasticity-lab` (Rust): training/session orchestration above `neuromod`'s reward-modulated STDP / Hebbian plasticity primitives; it does not implement those primitives itself.
 - `SynapticDistill.jl` (Julia): differentiable or online distillation and teacher-student knowledge transfer.
 - `SynapticDistill.jl` must not become the home for STDP logic; `plasticity-lab` must not absorb distillation logic.
 - A corresponding note should be aligned in `SynapticDistill.jl`.
 
 ### Allowed Dependencies
-- `neuromod` (for neuromodulator integration)
+- `neuromod` (network dynamics, neuromodulator state, and low-level plasticity primitives)
 - `limbic-critic` (for reward shaping)
 - `axon-encoder` (for input encoding)
 - Math and statistics libraries
@@ -254,8 +286,9 @@ This crate provides generic reward-modulated plasticity loops for spiking neural
 ### Forbidden Dependencies
 - Domain-specific training logic
 - Project-specific naming conventions
+- Duplicated STDP/R-STDP rule implementations (call into `neuromod` instead)
 
-(See issues #2, #3, #6 for full planning context and migration notes.)
+(See issues #2, #3, #6, #64 for full planning context and migration notes.)
 
 ## Cross-language notes
 

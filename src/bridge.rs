@@ -4,7 +4,8 @@
 //!
 //! After `limbic-critic` dropped its direct `neuromod` dependency, critics emit
 //! [`limbic_critic::ModulatorVector`]. This module owns the conversion into
-//! [`neuromod::NeuroModulators`] for training loops and reward-modulated STDP.
+//! [`neuromod::NeuroModulators`] so training loops in this crate can drive
+//! `neuromod`'s reward-modulated STDP without reimplementing it.
 //!
 //! Enabled only with the `integration` feature (optional `limbic-critic` dep).
 

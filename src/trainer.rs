@@ -168,7 +168,7 @@ impl PlasticityTrainer {
         network: &mut SpikingNetwork,
         data: &[TrainingExample],
     ) -> Result<TrainingSummary, TrainerError> {
-        self.run_session_generic::<false, _>(network, data, &mut NoopObserver)
+        self.run_session_generic(network, data, &mut NoopObserver, false)
     }
 
     /// Replays a batch like [`Self::run_session`], notifying `observer` after
@@ -184,7 +184,8 @@ impl PlasticityTrainer {
     /// ([`TrainerError::Observer`]).
     ///
     /// The observer is a generic type parameter (monomorphized, not `dyn`), so
-    /// a simple callback has no dynamic dispatch on the hot path.
+    /// a simple callback has no dynamic dispatch on the hot path. The
+    /// no-observer [`Self::run_session`] path does not construct events.
     ///
     /// # Errors
     ///
@@ -198,14 +199,15 @@ impl PlasticityTrainer {
         data: &[TrainingExample],
         observer: &mut O,
     ) -> Result<TrainingSummary, TrainerError> {
-        self.run_session_generic::<true, O>(network, data, observer)
+        self.run_session_generic(network, data, observer, true)
     }
 
-    fn run_session_generic<const OBSERVE: bool, O: TrainingObserver>(
+    fn run_session_generic<O: TrainingObserver>(
         &mut self,
         network: &mut SpikingNetwork,
         data: &[TrainingExample],
         observer: &mut O,
+        observe: bool,
     ) -> Result<TrainingSummary, TrainerError> {
         if data.is_empty() {
             return Err(TrainerError::EmptyBatch);
@@ -229,56 +231,84 @@ impl PlasticityTrainer {
                 valid_reward_count += 1;
             }
             summary.steps_processed += 1;
+            record_step_spikes(&mut summary, &spikes);
 
-            summary.total_spikes += spikes.len() as u64;
-            for &idx in &spikes {
-                if idx < summary.per_neuron_spikes.len() {
-                    summary.per_neuron_spikes[idx] += 1;
-                }
-            }
-
-            // `OBSERVE` is a const generic: the no-observer `run_session` path
-            // monomorphizes with `false` and drops this block entirely (no
-            // event construction, formatting, serialization, or dispatch).
-            if OBSERVE {
-                let event = TrainingStepEvent {
-                    step_index,
-                    reward: example.reward,
-                    modulators: &network.modulators,
-                    spike_indices: &spikes,
-                    steps_processed: summary.steps_processed,
-                    total_spikes: summary.total_spikes,
-                };
-                observer
-                    .on_step(event)
-                    .map_err(|cause| TrainerError::Observer {
+            if observe {
+                emit_step_event(
+                    observer,
+                    TrainingStepEvent {
                         step_index,
+                        reward: example.reward,
+                        modulators: &network.modulators,
+                        spike_indices: &spikes,
                         steps_processed: summary.steps_processed,
-                        cause: cause.to_string(),
-                    })?;
+                        total_spikes: summary.total_spikes,
+                    },
+                )?;
             }
         }
 
-        summary.avg_reward = if valid_reward_count > 0 {
-            total_reward / valid_reward_count as f32
-        } else {
-            0.0
-        };
-
-        let final_thresholds = network.get_thresholds();
-        for i in 0..network.neurons.len() {
-            summary
-                .threshold_drifts
-                .push(final_thresholds[i] - initial_thresholds[i]);
-
-            let mut w_deltas = Vec::new();
-            for (ch, &w) in network.neurons[i].weights.iter().enumerate() {
-                w_deltas.push(w - initial_weights[i][ch]);
-            }
-            summary.weight_drifts.push(w_deltas);
-        }
-
+        finish_summary(
+            &mut summary,
+            network,
+            &initial_thresholds,
+            &initial_weights,
+            total_reward,
+            valid_reward_count,
+        );
         Ok(summary)
+    }
+}
+
+fn record_step_spikes(summary: &mut TrainingSummary, spikes: &[usize]) {
+    summary.total_spikes += spikes.len() as u64;
+    for &idx in spikes {
+        if let Some(count) = summary.per_neuron_spikes.get_mut(idx) {
+            *count += 1;
+        }
+    }
+}
+
+fn emit_step_event<O: TrainingObserver>(
+    observer: &mut O,
+    event: TrainingStepEvent<'_>,
+) -> Result<(), TrainerError> {
+    let step_index = event.step_index;
+    let steps_processed = event.steps_processed;
+    observer
+        .on_step(event)
+        .map_err(|cause| TrainerError::Observer {
+            step_index,
+            steps_processed,
+            cause: cause.to_string(),
+        })
+}
+
+fn finish_summary(
+    summary: &mut TrainingSummary,
+    network: &SpikingNetwork,
+    initial_thresholds: &[f32],
+    initial_weights: &[Vec<f32>],
+    total_reward: f32,
+    valid_reward_count: usize,
+) {
+    summary.avg_reward = if valid_reward_count > 0 {
+        total_reward / valid_reward_count as f32
+    } else {
+        0.0
+    };
+
+    let final_thresholds = network.get_thresholds();
+    for i in 0..network.neurons.len() {
+        summary
+            .threshold_drifts
+            .push(final_thresholds[i] - initial_thresholds[i]);
+
+        let mut w_deltas = Vec::new();
+        for (ch, &w) in network.neurons[i].weights.iter().enumerate() {
+            w_deltas.push(w - initial_weights[i][ch]);
+        }
+        summary.weight_drifts.push(w_deltas);
     }
 }
 
@@ -717,7 +747,7 @@ mod tests {
     }
 
     #[test]
-    fn observer_failure_at_step_n_stops_before_n_plus_one() {
+    fn observer_failure_at_step_n_reports_index_and_does_not_see_n_plus_one() {
         let batch = subthreshold_batch();
         let fail_at = 1usize;
 
@@ -747,9 +777,23 @@ mod tests {
         assert!(displayed.contains("step 1"));
         assert!(displayed.contains("injected observer failure"));
         assert_eq!(observer.seen, vec![0, 1]);
+    }
 
-        // Network state matches a session that processed only examples 0..=N,
-        // not N+1.
+    #[test]
+    fn observer_failure_at_step_n_stops_before_n_plus_one() {
+        let batch = subthreshold_batch();
+        let fail_at = 1usize;
+
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let mut observer = FailAt {
+            fail_at,
+            seen: Vec::new(),
+        };
+        trainer
+            .run_session_with_observer(&mut network, &batch, &mut observer)
+            .expect_err("observer failure");
+
         let mut prefix_trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut prefix_network = small_network();
         prefix_trainer
@@ -886,5 +930,44 @@ mod tests {
     #[allow(deprecated)]
     fn spikenaut_trainer_module_path_alias_still_constructs() {
         let _trainer = super::SpikenautTrainer::new(TrainingConfig::default());
+    }
+
+    #[test]
+    fn record_step_spikes_ignores_out_of_range_indices() {
+        let mut summary = TrainingSummary {
+            per_neuron_spikes: vec![0, 0],
+            ..TrainingSummary::default()
+        };
+        record_step_spikes(&mut summary, &[0, 99, 1]);
+        assert_eq!(summary.total_spikes, 3);
+        assert_eq!(summary.per_neuron_spikes, vec![1, 1]);
+    }
+
+    #[test]
+    fn emit_step_event_maps_observer_error() {
+        let mods = NeuroModulators::default();
+        let spikes: &[usize] = &[];
+        let event = TrainingStepEvent {
+            step_index: 2,
+            reward: 0.0,
+            modulators: &mods,
+            spike_indices: spikes,
+            steps_processed: 3,
+            total_spikes: 0,
+        };
+        let mut fail = |_e: TrainingStepEvent<'_>| -> Result<(), &'static str> { Err("boom") };
+        let err = emit_step_event(&mut fail, event).expect_err("mapped");
+        match err {
+            TrainerError::Observer {
+                step_index,
+                steps_processed,
+                cause,
+            } => {
+                assert_eq!(step_index, 2);
+                assert_eq!(steps_processed, 3);
+                assert_eq!(cause, "boom");
+            }
+            other => panic!("expected Observer error, got {other:?}"),
+        }
     }
 }

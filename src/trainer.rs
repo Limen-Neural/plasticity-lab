@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::config::TrainingConfig;
-use crate::observer::{TrainingObserver, TrainingStepEvent};
+use crate::observer::{NoopObserver, TrainingObserver, TrainingStepEvent};
 use neuromod::{NeuroModulators, SpikingNetwork, StepError};
 use thiserror::Error;
 
@@ -168,7 +168,7 @@ impl PlasticityTrainer {
         network: &mut SpikingNetwork,
         data: &[TrainingExample],
     ) -> Result<TrainingSummary, TrainerError> {
-        self.run_session_generic::<false, _>(network, data, &mut ())
+        self.run_session_generic::<false, _>(network, data, &mut NoopObserver)
     }
 
     /// Replays a batch like [`Self::run_session`], notifying `observer` after

@@ -47,11 +47,13 @@ pub trait TrainingObserver {
     fn on_step(&mut self, event: TrainingStepEvent<'_>) -> Result<(), Self::Error>;
 }
 
-/// No-op observer used by [`crate::PlasticityTrainer::run_session`].
+/// Zero-sized no-op used by [`crate::PlasticityTrainer::run_session`].
 ///
-/// `on_step` is never invoked on that path (`OBSERVE = false`); this impl exists
-/// so the shared generic loop type-checks.
-impl TrainingObserver for () {
+/// `on_step` is never invoked on that path (`OBSERVE = false`); this type
+/// exists so the shared generic loop type-checks without passing `()`.
+pub(crate) struct NoopObserver;
+
+impl TrainingObserver for NoopObserver {
     type Error = core::convert::Infallible;
 
     #[inline]
@@ -108,12 +110,12 @@ mod tests {
     #[test]
     fn closure_observer_receives_event() {
         let mods = NeuroModulators::default();
-        let spikes: [usize; 0] = [];
+        let spikes: &[usize] = &[];
         let event = TrainingStepEvent {
             step_index: 3,
             reward: -0.1,
             modulators: &mods,
-            spike_indices: &spikes,
+            spike_indices: spikes,
             steps_processed: 4,
             total_spikes: 0,
         };

@@ -59,7 +59,9 @@ pub mod trainer;
 pub mod bridge;
 
 pub use config::TrainingConfig;
-pub use trainer::{PlasticityTrainer, TrainerError, TrainingExample, TrainingSummary};
+pub use trainer::{
+    PlasticityTrainer, SampleInvariant, TrainerError, TrainingExample, TrainingSummary,
+};
 
 #[cfg(feature = "critic")]
 pub use bridge::{apply_modulator_vector, from_neuromodulators, to_neuromodulators};

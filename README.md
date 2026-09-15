@@ -201,7 +201,8 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 | `TrainingConfig` | Serializable knobs (currently just the reward-modulation flag) |
 | `TrainingExample` | One sample: `stimuli: Vec<f32>` + `reward: f32` |
 | `TrainingSummary` | Session metrics after `run_session` |
-| `TrainerError` | `EmptyBatch` or wrapped `StepError` from neuromod |
+| `TrainerError` | `EmptyBatch`, `InvalidSample { index, reason }`, or wrapped `StepError` from neuromod |
+| `SampleInvariant` | Which batch-admission check failed (length, non-finite stimulus, infinite reward) |
 
 ### `train_step`
 
@@ -212,12 +213,13 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 
 ### `run_session`
 
-1. Rejects empty batches (`TrainerError::EmptyBatch`).
-2. Snapshots thresholds and weights.
-3. Calls `train_step` for each `TrainingExample`.
-4. Aggregates spikes and average reward.
-5. Records per-neuron threshold and weight drifts vs. session start.
-6. Returns `TrainingSummary`.
+1. Rejects empty batches (`TrainerError::EmptyBatch`) without mutating the network.
+2. Preflights every example (stimulus length vs `num_channels`, finite stimuli, infinite reward) and returns `TrainerError::InvalidSample { index, reason }` on the first failure — still with no mutation.
+3. Snapshots thresholds and weights.
+4. Calls `train_step` for each `TrainingExample` in slice order.
+5. Aggregates spikes and average reward (NaN rewards are omitted from the mean, matching `train_step`).
+6. Records per-neuron threshold and weight drifts vs. session start.
+7. Returns `TrainingSummary`.
 
 ### `TrainingSummary` fields
 
@@ -259,7 +261,7 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 - Mapping externally supplied scalar rewards or modulator vectors (e.g. from `limbic-critic`) into a training step
 - Training examples / batches (`TrainingExample`)
 - Progress and training summaries (`TrainingSummary`)
-- Training/session metrics and invariants (spike counts, threshold/weight drift, empty-batch rejection)
+- Training/session metrics and invariants (spike counts, threshold/weight drift, empty-batch rejection, atomic batch preflight)
 - The critic → neuromodulator adapter between independently owned crates (the `bridge` module, `critic` feature)
 - Checkpoint/session orchestration, if/when it is actually implemented — **not implemented today** (see [Does Not Own](#does-not-own))
 

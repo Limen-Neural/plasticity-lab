@@ -128,6 +128,14 @@ plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", featu
 
 **When to enable `critic`:** you want Cargo to resolve `limbic-critic` alongside this crate and use the `bridge` adapter to turn a `ModulatorVector` into a training step via `train_step_from_critic`/`apply_modulator_vector`. The core trainer API does not require the feature; it always takes precomputed `stimuli: &[f32]` and `reward: f32`.
 
+Exercise both configurations locally (this is also what CI runs — `critic` is
+currently the only optional feature, so these two cover every distinct build):
+
+```bash
+cargo test
+cargo test --all-features
+```
+
 ## Common patterns
 
 ### Basic reward-modulated session
@@ -304,14 +312,19 @@ Do not expect a Python package from this repository. There is currently no activ
 
 For coding agents and human contributors:
 
-- [AGENTS.md](AGENTS.md) — project conventions, setup commands, architecture map, allowed deps
-- [REVIEW.md](REVIEW.md) — PR review checklist and bot-response expectations
+- [AGENTS.md](https://github.com/Limen-Neural/plasticity-lab/blob/main/AGENTS.md) — project conventions, setup commands, architecture map, allowed deps
+- [REVIEW.md](https://github.com/Limen-Neural/plasticity-lab/blob/main/REVIEW.md) — PR review checklist and bot-response expectations
+- [RELEASE.md](https://github.com/Limen-Neural/plasticity-lab/blob/main/RELEASE.md) — release preflight checklist and tag/publish process
+
+(Absolute links: these files are excluded from the packaged crate, so a
+relative link would be dead when README is read from crates.io/docs.rs.)
 
 Quick local checks:
 
 ```bash
 cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
+cargo test
 cargo test --all-features
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 ```

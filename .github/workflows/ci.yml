@@ -63,7 +63,16 @@ jobs:
       - name: Build
         run: cargo build --all-features
 
-      - name: Test
+      # `critic` is currently the crate's only optional feature and
+      # `default = []`, so `--no-default-features`/plain `cargo test` are
+      # identical builds, and so are `--features critic`/`--all-features` —
+      # running all four would just recompile+retest the same two
+      # configurations twice per PR. Revisit if a second optional feature
+      # is ever added.
+      - name: Test (default features)
+        run: cargo test
+
+      - name: Test (all features)
         run: cargo test --all-features
 
       - name: Docs

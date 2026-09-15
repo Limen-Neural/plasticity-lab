@@ -1,0 +1,152 @@
+# Release process
+
+Preflight checklist for cutting a `plasticity-lab` release, per #48. Run every
+step from a clean checkout of the commit intended for release.
+
+## 1. Confirm publication blockers are closed or explicitly deferred
+
+All of epic #43's blockers must be closed, or deferred with rationale
+recorded in the tracking issue. As of this writing:
+
+- #64, #65, #66 — closed (scope, trainer rename, config honesty)
+- #67, #68 — the dependency/feature cleanup and metadata hygiene are done;
+  the git-dependency → crates.io-version conversion stays **explicitly
+  deferred** (see [Known limitation](#known-limitation-these-currently-fail) below)
+- #47 — rustdoc/doctest coverage, closed
+- #46 — feature-matrix CI; its original PR (#78) merged into a branch that
+  was later squash-merged separately and didn't carry the change through to
+  `main`, so the fix is re-landed as part of this PR instead
+- #44, #45, #49 — closed
+
+## 2. Run the full validation suite
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test
+cargo test --all-features
+RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
+cargo deny --locked check
+```
+
+All must pass. `cargo deny` may print `warn`-level license/yanked-crate
+notices (non-blocking per `deny.toml`); it must not print advisory, bans, or
+source failures.
+
+## 3. Update CHANGELOG.md
+
+Move the `[Unreleased]` section's content under a new `## [0.2.0] -
+<date>` heading, keeping the breaking-change migration notes intact. Leave a
+fresh empty `[Unreleased]` section above it.
+
+## 4. Bump the package version
+
+Set `version` in `Cargo.toml` to `0.2.0`, then run `cargo build` once to
+update `Cargo.lock`'s own package entry.
+
+## 5. Commit the release edits
+
+Commit the `CHANGELOG.md`, `Cargo.toml`, and `Cargo.lock` changes from steps
+3–4. `cargo package` refuses a dirty working directory without
+`--allow-dirty` — which this checklist does not use, since packaging
+uncommitted state would let the signed tag in step 8 point at a commit that
+doesn't match what was actually packaged/published.
+
+## 6. Package validation
+
+```bash
+cargo package --list --all-features   # manually review — should list only release-relevant files
+cargo package --all-features
+cargo publish --dry-run --all-features
+```
+
+`--all-features` matters here specifically: without it, `cargo package`'s
+build-verification step only compiles the default feature set, so a
+registry-resolved `limbic-critic` version that's actually incompatible with
+the `critic` feature's code would pass this check and only surface once
+docs.rs (or a consumer) builds with all features against the immutable
+published version.
+
+### Known limitation: these currently fail
+
+`cargo package` and `cargo publish --dry-run` **cannot succeed today**.
+Cargo requires a version requirement for every dependency — including
+optional ones — when packaging a crate for publish, and `limbic-critic` and
+`neuromod` are still `branch = "main"` git dependencies with no crates.io
+version (see `Cargo.toml`). This is a genuine cross-repo blocker: those
+sibling crates need to be published to crates.io (or otherwise given a
+concrete version) before this crate can be packaged for real.
+
+**Do not work around this by re-pinning to a different mutable git ref, a
+path dependency, or a fake version override.** `CLAUDE.md` says plainly not
+to change the `branch = "main"` git-dependency pinning without discussion,
+and `REVIEW.md`'s reviewer checklist backs that with "No pinned git rev
+changes without discussion." Neither document discusses path dependencies or
+fake version overrides by name, but the same reasoning applies: it would
+just move the dishonesty from "can't package" to "packages, but the
+published manifest lies about what it resolves to." Wait for the sibling
+crates, or explicitly re-scope this release to depend only on
+already-published siblings.
+
+**Once `neuromod` and `limbic-critic` are actually published, this doesn't
+resolve itself** — publishing them doesn't change this crate's `Cargo.toml`.
+Before rerunning `cargo package`/`cargo publish --dry-run`:
+
+1. Edit both dependency entries in `Cargo.toml` to add a concrete
+   crates.io version requirement matching each sibling's actual published
+   version — a full version like `neuromod = { version = "0.7.0", git =
+   "...", branch = "main" }`, not a bare major digit or a placeholder like
+   `"0.x"`: Cargo treats a major-only requirement (`"0"`) as
+   `>=0.0.0, <1.0.0`, which would let a later semver-breaking 0.y release
+   satisfy the dependency instead of pinning to what was actually
+   validated. Keep the git source for as long as this repo still tracks
+   `main` rather than a released version, or drop it entirely once that
+   tracking is no longer needed.
+2. Re-run step 2's validation suite against the edited manifest.
+3. Commit the updated `Cargo.toml` and any resulting `Cargo.lock` changes.
+4. Only then return to step 6 — `cargo package` refuses a dirty working
+   directory (without `--allow-dirty`, which this checklist doesn't use)
+   the same way step 5 does.
+
+## 7. Land the release commit on `main`
+
+Only after step 6 actually succeeds. The commit from step 5 (and any
+`Cargo.toml`/`Cargo.lock` follow-up from step 6's known-limitation path) must
+actually be on `origin/main` before tagging it — pushing a tag alone
+(`git push origin v0.2.0`) only transfers the tag object, not the commit
+history behind it, per this repo's own convention that PRs target `main`
+(see `AGENTS.md`). Open a PR for the release commit and merge it, or push
+`main` directly if that's this repo's practice for release commits, then
+`git checkout main && git pull` before continuing.
+
+## 8. Publish, then tag
+
+Publish **before** tagging — a tag pushed before a successful
+`cargo publish` advertises a version that isn't actually installable if
+publish then fails:
+
+```bash
+cargo publish
+git tag -s v0.2.0 -m "v0.2.0"
+git push origin v0.2.0
+```
+
+Then create a GitHub Release for the tag. If `.github/workflows/linear-release.yml`
+has landed by then (tracked separately, see #79), publishing the Release
+fires it automatically and marks the matching release in the
+[`plasticity-lab` Linear pipeline](https://linear.app/rpd-34/pipeline/plasticity-lab/releases)
+complete — it needs a `LINEAR_ACCESS_KEY` repository secret (a release
+pipeline access key, not a personal API key; see the workflow's header
+comment). If that workflow hasn't landed yet, mark the Linear release
+complete by hand instead.
+
+## 9. Verify the published artifact
+
+- Check the crate page renders correctly on crates.io
+- Check docs.rs actually built the `critic`-feature docs. `Cargo.toml`'s
+  `[package.metadata.docs.rs] all-features = true` should make this happen
+  automatically — docs.rs does **not** enable optional features by default
+  on its own — but verify the built site, don't just trust the config
+- In a scratch directory, `cargo new` + add `plasticity-lab = "0.2.0"` and
+  confirm it builds against the registry, independent of this repository's
+  checkout

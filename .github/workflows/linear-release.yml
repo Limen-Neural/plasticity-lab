@@ -1,0 +1,73 @@
+name: Linear release sync
+
+# Marks the matching Linear release complete when a GitHub Release is
+# published for this repo, so the "plasticity-lab" release pipeline in
+# Linear (https://linear.app/rpd-34/pipeline/plasticity-lab/releases)
+# doesn't have to be updated by hand after every publish.
+#
+# Uses Linear's own first-party action (github.com/linear/linear-release-action)
+# rather than hand-rolled GraphQL: it already knows the right mutation shape
+# and auth flow for a scheduled pipeline like this one.
+#
+# Also runnable manually (workflow_dispatch) against a specific tag, so it
+# can be exercised once against a real (or throwaway) release before being
+# trusted to run unattended.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag of the release to sync (e.g. v0.2.0)"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Mark Linear release complete
+    runs-on: ubuntu-latest
+    steps:
+      # Untrusted (a workflow_dispatch tag is caller-supplied) but only ever
+      # passed through `env:` and read back as "$VAR", never interpolated
+      # directly into a `run:` script via ${{ }} — see the repo's other
+      # workflow-injection notes.
+      - name: Determine target tag
+        id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          DISPATCH_TAG: ${{ github.event.inputs.tag }}
+          RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$DISPATCH_TAG"
+            # A release-event tag_name is a Git tag and can't contain a
+            # newline; a workflow_dispatch string input is unconstrained.
+            # Reject anything that isn't a well-formed tag ref before it
+            # ever reaches $GITHUB_OUTPUT, so a crafted multiline value
+            # can't inject extra output records.
+            if ! git check-ref-format "refs/tags/$tag"; then
+              echo "::error::'$tag' is not a valid Git tag name." >&2
+              exit 1
+            fi
+          else
+            tag="$RELEASE_EVENT_TAG"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0 # linear-release-action wants commit history available
+          persist-credentials: false
+
+      - name: Complete the matching Linear release
+        uses: linear/linear-release-action@53ad0f863963e7f8e270fba18426bbb55ef55384 # v0.17.2
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: complete
+          version: ${{ steps.tag.outputs.version }}

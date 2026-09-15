@@ -36,15 +36,54 @@ pub struct TrainingExample {
     pub reward: f32,
 }
 
+/// Batch-admission invariant violated by one [`TrainingExample`].
+///
+/// Produced by [`PlasticityTrainer::run_session`]'s preflight pass *before* any
+/// network, modulator, eligibility, or metric state mutates. Single-step APIs
+/// (`train_step`, `train_step_with_modulators`, and `train_step_from_critic`) do
+/// not run this check — they stay compatible with their existing `StepError`
+/// contracts, including NaN-reward skipping in `train_step`.
+///
+/// `TrainingExample` has no sample IDs, so ordering is the batch slice order
+/// (index `0` is the first example). `TrainingConfig` currently has no invalid
+/// encodings (`use_reward_modulation` is a `bool`); there is therefore no
+/// config-level rejection variant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+pub enum SampleInvariant {
+    /// `stimuli.len()` did not match [`SpikingNetwork::num_channels`].
+    #[error("stimulus length mismatch: expected {expected}, got {got}")]
+    StimulusLenMismatch { expected: usize, got: usize },
+    /// A stimulus component was NaN or ±infinity.
+    #[error("non-finite stimulus at channel {channel}")]
+    NonFiniteStimulus { channel: usize },
+    /// Reward was ±infinity (NaN remains allowed: `train_step` skips modulation
+    /// and `run_session` omits it from `avg_reward`).
+    #[error("infinite reward")]
+    InfiniteReward,
+}
+
 /// Errors from batch training sessions.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum TrainerError {
     /// Underlying network step failed.
     #[error("network step failed: {0:?}")]
     Step(StepError),
     /// `run_session` was called with an empty batch.
+    ///
+    /// Empty is a batch-level condition (no sample index). The network, trainer
+    /// config, and any caller-owned metrics are left untouched.
     #[error("empty training batch")]
     EmptyBatch,
+    /// Preflight rejected the batch because sample `index` violated `reason`.
+    ///
+    /// No earlier sample has been applied; trainer and network state are unchanged.
+    #[error("invalid training sample {index}: {reason}")]
+    InvalidSample {
+        /// Zero-based index into the batch slice.
+        index: usize,
+        /// Which admission invariant failed.
+        reason: SampleInvariant,
+    },
 }
 
 /// Reward-modulated training loop over a [`SpikingNetwork`].
@@ -137,18 +176,26 @@ impl PlasticityTrainer {
 
     /// Replays a batch of generic training examples and returns aggregated metrics.
     ///
+    /// Admission is atomic: every example is validated (dimensions, finite
+    /// stimuli, infinite-reward) *before* the first `train_step`. A malformed
+    /// sample at index `N` therefore cannot leave samples `0..N` applied.
+    /// Examples are then processed in slice order, matching the historical
+    /// sequential contract.
+    ///
     /// # Errors
     ///
-    /// - [`TrainerError::EmptyBatch`] if `data` is empty.
-    /// - [`TrainerError::Step`] if any network step fails.
+    /// - [`TrainerError::EmptyBatch`] if `data` is empty (no sample index).
+    /// - [`TrainerError::InvalidSample`] if any example fails preflight; the
+    ///   error names the first failing index and invariant. Network and trainer
+    ///   state are unchanged.
+    /// - [`TrainerError::Step`] if a network step fails after admission (for
+    ///   example a `StepError` that cannot be seen from the example alone).
     pub fn run_session(
         &mut self,
         network: &mut SpikingNetwork,
         data: &[TrainingExample],
     ) -> Result<TrainingSummary, TrainerError> {
-        if data.is_empty() {
-            return Err(TrainerError::EmptyBatch);
-        }
+        Self::admit_batch(network, data)?;
 
         let mut summary = TrainingSummary::default();
         let initial_thresholds = network.get_thresholds();
@@ -198,6 +245,43 @@ impl PlasticityTrainer {
 
         Ok(summary)
     }
+
+    /// Validates the whole batch without mutating `network` or `self`.
+    ///
+    /// Fails closed on the first violation so callers can report a single sample
+    /// index. Empty batches are a distinct error (no index to name).
+    fn admit_batch(network: &SpikingNetwork, data: &[TrainingExample]) -> Result<(), TrainerError> {
+        if data.is_empty() {
+            return Err(TrainerError::EmptyBatch);
+        }
+
+        for (index, example) in data.iter().enumerate() {
+            if let Some(reason) = sample_invariant(network, example) {
+                return Err(TrainerError::InvalidSample { index, reason });
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Returns the first violated admission invariant for `example`, if any.
+fn sample_invariant(
+    network: &SpikingNetwork,
+    example: &TrainingExample,
+) -> Option<SampleInvariant> {
+    if example.stimuli.len() != network.num_channels {
+        return Some(SampleInvariant::StimulusLenMismatch {
+            expected: network.num_channels,
+            got: example.stimuli.len(),
+        });
+    }
+    if let Some(channel) = example.stimuli.iter().position(|x| !x.is_finite()) {
+        return Some(SampleInvariant::NonFiniteStimulus { channel });
+    }
+    if example.reward.is_infinite() {
+        return Some(SampleInvariant::InfiniteReward);
+    }
+    None
 }
 
 /// Deprecated alias for [`PlasticityTrainer`], also reachable via the full module path.
@@ -218,6 +302,41 @@ mod tests {
 
     fn small_network() -> SpikingNetwork {
         SpikingNetwork::with_dimensions(4, 2, 8)
+    }
+
+    fn network_snapshot(network: &SpikingNetwork) -> String {
+        serde_json::to_string(network).expect("serialize network snapshot")
+    }
+
+    /// Non-default weights, traces, step counter, modulators, and EMA so a
+    /// missed preflight (which would run sample 0) cannot match by accident.
+    fn seed_nonzero_network_state(network: &mut SpikingNetwork) {
+        network.global_step = 17;
+        network.modulators.dopamine = 0.42;
+        network.modulators.norepinephrine = 0.37;
+        network.modulators.serotonin = 0.21;
+        network.modulators.acetylcholine = 0.18;
+        for (i, value) in network.predictive_state.iter_mut().enumerate() {
+            *value = 0.05 * (i as f32 + 1.0);
+        }
+        for (i, t) in network.input_spike_times.iter_mut().enumerate() {
+            *t = i as i64;
+        }
+        for neuron in &mut network.neurons {
+            neuron.membrane_potential = 0.01;
+            neuron.last_spike_time = 3;
+            neuron.weights.fill(0.2);
+            for trace in &mut neuron.eligibility {
+                trace.value = 0.3;
+            }
+        }
+    }
+
+    fn valid_example() -> TrainingExample {
+        TrainingExample {
+            stimuli: vec![0.25; 8],
+            reward: 0.2,
+        }
     }
 
     #[test]
@@ -313,10 +432,16 @@ mod tests {
     fn run_session_empty_batch_errors() {
         let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
+        seed_nonzero_network_state(&mut network);
+        let before = network_snapshot(&network);
+        let config_before = trainer.config;
+
         let err = trainer
             .run_session(&mut network, &[])
             .expect_err("empty batch");
         assert!(matches!(err, TrainerError::EmptyBatch));
+        assert_eq!(network_snapshot(&network), before);
+        assert_eq!(trainer.config, config_before);
     }
 
     #[test]
@@ -526,5 +651,203 @@ mod tests {
     #[allow(deprecated)]
     fn spikenaut_trainer_module_path_alias_still_constructs() {
         let _trainer = super::SpikenautTrainer::new(TrainingConfig::default());
+    }
+
+    #[test]
+    fn train_step_still_returns_step_error_on_length_mismatch() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let err = trainer
+            .train_step(&mut network, &[0.2; 3], 0.1)
+            .expect_err("single-step API stays StepError, not batch preflight");
+        assert!(matches!(
+            err,
+            StepError::InputLenMismatch {
+                expected: 8,
+                got: 3
+            }
+        ));
+    }
+
+    #[test]
+    fn batch_preflight_is_atomic_when_final_sample_is_invalid() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        seed_nonzero_network_state(&mut network);
+        let before = network_snapshot(&network);
+        let config_before = trainer.config;
+        let global_step_before = network.global_step;
+        let eligibility_before: Vec<Vec<f32>> = network
+            .neurons
+            .iter()
+            .map(|n| n.eligibility.iter().map(|t| t.value).collect())
+            .collect();
+        let weights_before: Vec<Vec<f32>> =
+            network.neurons.iter().map(|n| n.weights.clone()).collect();
+
+        let batch = vec![
+            TrainingExample {
+                stimuli: vec![0.4; 8],
+                reward: 0.5,
+            },
+            TrainingExample {
+                stimuli: vec![0.6; 8],
+                reward: -0.2,
+            },
+            TrainingExample {
+                stimuli: vec![0.3; 3],
+                reward: 0.1,
+            },
+        ];
+
+        let err = trainer
+            .run_session(&mut network, &batch)
+            .expect_err("late malformed sample must reject the batch");
+
+        assert_eq!(
+            err,
+            TrainerError::InvalidSample {
+                index: 2,
+                reason: SampleInvariant::StimulusLenMismatch {
+                    expected: 8,
+                    got: 3,
+                },
+            }
+        );
+        assert_eq!(
+            err.to_string(),
+            "invalid training sample 2: stimulus length mismatch: expected 8, got 3"
+        );
+
+        assert_eq!(network.global_step, global_step_before);
+        assert_eq!(
+            network
+                .neurons
+                .iter()
+                .map(|n| n.eligibility.iter().map(|t| t.value).collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            eligibility_before
+        );
+        assert_eq!(
+            network
+                .neurons
+                .iter()
+                .map(|n| n.weights.clone())
+                .collect::<Vec<_>>(),
+            weights_before
+        );
+        assert_eq!(network_snapshot(&network), before);
+        assert_eq!(trainer.config, config_before);
+    }
+
+    #[test]
+    fn batch_preflight_reports_first_invalid_sample() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let batch = vec![
+            valid_example(),
+            TrainingExample {
+                stimuli: vec![0.2; 5],
+                reward: 0.1,
+            },
+            TrainingExample {
+                stimuli: vec![f32::NAN; 8],
+                reward: 0.1,
+            },
+        ];
+        let err = trainer
+            .run_session(&mut network, &batch)
+            .expect_err("first invalid sample wins");
+        assert!(matches!(
+            err,
+            TrainerError::InvalidSample {
+                index: 1,
+                reason: SampleInvariant::StimulusLenMismatch {
+                    expected: 8,
+                    got: 5
+                },
+            }
+        ));
+    }
+
+    #[test]
+    fn batch_preflight_rejects_non_finite_stimulus() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        seed_nonzero_network_state(&mut network);
+        let before = network_snapshot(&network);
+
+        let mut stimuli = vec![0.2; 8];
+        stimuli[4] = f32::INFINITY;
+        let batch = vec![
+            valid_example(),
+            TrainingExample {
+                stimuli,
+                reward: 0.1,
+            },
+        ];
+        let err = trainer
+            .run_session(&mut network, &batch)
+            .expect_err("non-finite stimulus");
+        assert_eq!(
+            err,
+            TrainerError::InvalidSample {
+                index: 1,
+                reason: SampleInvariant::NonFiniteStimulus { channel: 4 },
+            }
+        );
+        assert_eq!(network_snapshot(&network), before);
+    }
+
+    #[test]
+    fn batch_preflight_rejects_infinite_reward() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        seed_nonzero_network_state(&mut network);
+        let before = network_snapshot(&network);
+
+        let batch = vec![
+            valid_example(),
+            TrainingExample {
+                stimuli: vec![0.2; 8],
+                reward: f32::NEG_INFINITY,
+            },
+        ];
+        let err = trainer
+            .run_session(&mut network, &batch)
+            .expect_err("infinite reward");
+        assert_eq!(
+            err,
+            TrainerError::InvalidSample {
+                index: 1,
+                reason: SampleInvariant::InfiniteReward,
+            }
+        );
+        assert_eq!(network_snapshot(&network), before);
+    }
+
+    #[test]
+    fn valid_batch_preserves_sample_ordering_and_avg_reward() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let batch = vec![
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: 0.4,
+            },
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: -0.1,
+            },
+            TrainingExample {
+                stimuli: vec![0.005; 8],
+                reward: 0.0,
+            },
+        ];
+        let summary = trainer
+            .run_session(&mut network, &batch)
+            .expect("valid batch");
+        assert_eq!(summary.steps_processed, batch.len());
+        assert!((summary.avg_reward - 0.1).abs() < 1e-5);
     }
 }

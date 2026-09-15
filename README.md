@@ -107,6 +107,8 @@ fn main() {
 
 For a single network step with an external reward, call `train_step` directly (see [Architecture brief](#architecture-brief)).
 
+For per-step telemetry without copying the network, use `run_session_with_observer` (see [Per-step session observer](#per-step-session-observer)).
+
 ### 4. Optional integrations
 
 To pull in `limbic-critic` as an optional dep and enable the critic → neuromodulator bridge, enable the `critic` feature — see [Choosing features](#choosing-features).
@@ -143,6 +145,44 @@ cargo test --all-features
 ### Basic reward-modulated session
 
 Use `TrainingExample` batches and `run_session` when you have a fixed list of stimuli/reward pairs (the [Getting started](#getting-started) example).
+
+### Per-step session observer
+
+`run_session` only returns a final `TrainingSummary`. To receive step index, reward, effective modulators, and spike indices after each successful network step, call `run_session_with_observer`. The event is borrowed (no network copy, no logging crate). Returning an error aborts before the next example; the failing step index and processed count are in `TrainerError::Observer`.
+
+```rust
+use neuromod::SpikingNetwork;
+use plasticity_lab::{
+    PlasticityTrainer, TrainingConfig, TrainingExample, TrainingObserver, TrainingStepEvent,
+};
+
+struct SpikeCounter(u64);
+
+impl TrainingObserver for SpikeCounter {
+    type Error = &'static str;
+
+    fn on_step(&mut self, event: TrainingStepEvent<'_>) -> Result<(), Self::Error> {
+        self.0 += event.spike_indices.len() as u64;
+        Ok(())
+    }
+}
+
+fn main() {
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+    let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
+    let batch = vec![TrainingExample {
+        stimuli: vec![0.25; 64],
+        reward: 0.2,
+    }];
+    let mut observer = SpikeCounter(0);
+    let summary = trainer
+        .run_session_with_observer(&mut network, &batch, &mut observer)
+        .unwrap();
+    assert_eq!(observer.0, summary.total_spikes);
+}
+```
+
+A JSONL writer belongs in application code, not this crate — see `examples/jsonl_session_observer.rs`.
 
 ### Single-step control
 
@@ -197,11 +237,13 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 
 | Item | Role |
 |------|------|
-| `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step` and `run_session` |
+| `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step`, `run_session`, and `run_session_with_observer` |
 | `TrainingConfig` | Serializable knobs (currently just the reward-modulation flag) |
 | `TrainingExample` | One sample: `stimuli: Vec<f32>` + `reward: f32` |
 | `TrainingSummary` | Session metrics after `run_session` |
-| `TrainerError` | `EmptyBatch` or wrapped `StepError` from neuromod |
+| `TrainingStepEvent` | Borrowed per-step snapshot for observers (no mutable network access) |
+| `TrainingObserver` | Generic callback invoked after each successful session step |
+| `TrainerError` | `EmptyBatch`, wrapped `StepError` from neuromod, or `Observer` abort |
 
 ### `train_step`
 
@@ -218,6 +260,12 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 4. Aggregates spikes and average reward.
 5. Records per-neuron threshold and weight drifts vs. session start.
 6. Returns `TrainingSummary`.
+
+No per-step event is constructed on this path.
+
+### `run_session_with_observer`
+
+Same as `run_session`, plus one `TrainingStepEvent` after each successful `train_step`. Observer failure returns `TrainerError::Observer` and does not step the next example. A failed `train_step` does not emit an event for that example.
 
 ### `TrainingSummary` fields
 
@@ -245,7 +293,8 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
                   ▼
              plasticity-lab   (this crate)
                   │  training/session orchestration: train_step,
-                  │  run_session, reward/modulator-vector mapping,
+                  │  run_session, run_session_with_observer,
+                  │  reward/modulator-vector mapping,
                   │  batches, metrics, critic bridge adapter
                   ▼
                 neuromod
@@ -255,10 +304,11 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 ```
 
 ### Owns
-- Training/session orchestration (`train_step`, `run_session`)
+- Training/session orchestration (`train_step`, `run_session`, `run_session_with_observer`)
 - Mapping externally supplied scalar rewards or modulator vectors (e.g. from `limbic-critic`) into a training step
 - Training examples / batches (`TrainingExample`)
 - Progress and training summaries (`TrainingSummary`)
+- Optional per-step session telemetry (`TrainingObserver` / `TrainingStepEvent`) — not logging, metrics, or storage backends
 - Training/session metrics and invariants (spike counts, threshold/weight drift, empty-batch rejection)
 - The critic → neuromodulator adapter between independently owned crates (the `bridge` module, `critic` feature)
 - Checkpoint/session orchestration, if/when it is actually implemented — **not implemented today** (see [Does Not Own](#does-not-own))

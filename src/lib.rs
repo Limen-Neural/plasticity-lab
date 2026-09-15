@@ -8,7 +8,8 @@
 //! reward-modulated STDP primitives. `plasticity-lab` does not reimplement those
 //! primitives — it drives them through `neuromod`'s public API: single-step
 //! reward modulation via [`PlasticityTrainer::train_step`] and batch sessions via
-//! [`PlasticityTrainer::run_session`].
+//! [`PlasticityTrainer::run_session`] (optional per-step telemetry via
+//! [`PlasticityTrainer::run_session_with_observer`]).
 //!
 //! # Features
 //!
@@ -53,12 +54,14 @@
 //! primitives), and common usage patterns.
 
 pub mod config;
+pub mod observer;
 pub mod trainer;
 
 #[cfg(feature = "critic")]
 pub mod bridge;
 
 pub use config::TrainingConfig;
+pub use observer::{TrainingObserver, TrainingStepEvent};
 pub use trainer::{PlasticityTrainer, TrainerError, TrainingExample, TrainingSummary};
 
 #[cfg(feature = "critic")]

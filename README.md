@@ -189,6 +189,33 @@ let config = TrainingConfig {
 
 `TrainingConfig::default()` matches the value above. Set `use_reward_modulation: false` to step the network without adjusting neuromodulators from the reward (stimuli still apply).
 
+### Reproducible (seeded) replay
+
+`train_step` / `run_session` still use neuromod's convenience thread-local RNG. For a replayable above-threshold session, pass a seeded generator:
+
+```rust
+use neuromod::SpikingNetwork;
+use plasticity_lab::{PlasticityTrainer, TrainingConfig, TrainingExample};
+use rand::SeedableRng;
+use rand::rngs::StdRng;
+
+fn main() {
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+    let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
+    let mut rng = StdRng::seed_from_u64(42);
+    let batch = vec![TrainingExample {
+        stimuli: vec![0.25; 64],
+        reward: 0.2,
+    }];
+    let summary = trainer
+        .run_session_with_rng(&mut network, &batch, &mut rng)
+        .unwrap();
+    println!("processed={}", summary.steps_processed);
+}
+```
+
+Checkpointing is still application-owned. Persist the network (neuromod already serde's `SpikingNetwork`) together with the RNG state or the original seed and step count. This crate does not ingest replay files.
+
 `TrainingConfig` only exposes fields that drive an explicit code path in `train_step`. It does not expose a `learning_rate`, homeostasis setpoint, or `batch_size` knob: low-level STDP / homeostasis tuning is owned by `neuromod::SpikingNetwork`, which derives its own learning rate and thresholds from neuromodulator state, and batches are passed directly as `&[TrainingExample]` slices to `run_session` rather than configured. See `CHANGELOG.md` for the migration note if you are upgrading from a config that set those fields.
 
 ## Architecture brief
@@ -197,7 +224,7 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 
 | Item | Role |
 |------|------|
-| `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step` and `run_session` |
+| `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step`, `run_session`, and seeded `*_with_rng` variants |
 | `TrainingConfig` | Serializable knobs (currently just the reward-modulation flag) |
 | `TrainingExample` | One sample: `stimuli: Vec<f32>` + `reward: f32` |
 | `TrainingSummary` | Session metrics after `run_session` |
@@ -290,6 +317,7 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 - `neuromod` (network dynamics, neuromodulator state, and low-level plasticity primitives)
 - `limbic-critic` (`critic` feature only — for reward shaping via the bridge)
 - Serialization libraries
+- `rand` (public `Rng` bound for seeded `*_with_rng` replay)
 
 `axon-encoder` is intentionally **not** a dependency: this crate has no code that consumes it, so it isn't retained just to make Cargo resolve it (see #67). Re-add it only if a concrete API surface with tests needs it.
 

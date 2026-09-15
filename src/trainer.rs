@@ -2,12 +2,13 @@
 
 use crate::config::TrainingConfig;
 use neuromod::{NeuroModulators, SpikingNetwork, StepError};
+use rand::Rng;
 use thiserror::Error;
 
 /// Summary metrics collected over a [`PlasticityTrainer::run_session`] call.
 ///
 /// Drifts are relative to network state at the start of the session.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, PartialEq)]
 pub struct TrainingSummary {
     /// Number of training examples processed.
     pub steps_processed: usize,
@@ -79,27 +80,43 @@ impl PlasticityTrainer {
         stimuli: &[f32],
         reward: f32,
     ) -> Result<Vec<usize>, StepError> {
-        let mut modulators: NeuroModulators = network.modulators;
-
-        // Skip modulation on NaN: f32::clamp returns NaN unchanged rather than
-        // panicking, so a NaN reward would otherwise propagate silently into
-        // modulators that poison subsequent STDP / homeostasis updates.
-        if self.config.use_reward_modulation && !reward.is_nan() {
-            // Positive reward shifts toward dopamine; negative toward norepinephrine
-            // (stress/arousal). neuromod replaced the former cortisol field with
-            // norepinephrine (see neuromod::NeuroModulators).
-            if reward > 0.0 {
-                modulators.dopamine = (modulators.dopamine + reward * 0.1).clamp(0.0, 1.0);
-                modulators.norepinephrine =
-                    (modulators.norepinephrine - reward * 0.05).clamp(0.0, 1.0);
-            } else {
-                modulators.norepinephrine =
-                    (modulators.norepinephrine - reward * 0.2).clamp(0.0, 1.0);
-                modulators.dopamine = (modulators.dopamine + reward * 0.1).clamp(0.0, 1.0);
-            }
-        }
-
+        let modulators = self.modulators_for_reward(network, reward);
         network.step(stimuli, &modulators)
+    }
+
+    /// Same as [`Self::train_step`], but drives neuromod's stochastic input
+    /// encoding from a caller-supplied RNG.
+    ///
+    /// Use this when a session must be replayable: the same network state,
+    /// config, stimuli, reward, and RNG stream produce identical spikes and
+    /// plasticity updates. `train_step` keeps the convenience path that uses
+    /// neuromod's thread-local RNG.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use neuromod::SpikingNetwork;
+    /// use plasticity_lab::{PlasticityTrainer, TrainingConfig};
+    /// use rand::SeedableRng;
+    /// use rand::rngs::StdRng;
+    ///
+    /// let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+    /// let mut network = SpikingNetwork::with_dimensions(4, 2, 8);
+    /// let mut rng = StdRng::seed_from_u64(42);
+    /// let spikes = trainer
+    ///     .train_step_with_rng(&mut network, &[0.25; 8], 0.2, &mut rng)
+    ///     .unwrap();
+    /// assert!(spikes.iter().all(|&i| i < 4));
+    /// ```
+    pub fn train_step_with_rng<R: Rng + ?Sized>(
+        &mut self,
+        network: &mut SpikingNetwork,
+        stimuli: &[f32],
+        reward: f32,
+        rng: &mut R,
+    ) -> Result<Vec<usize>, StepError> {
+        let modulators = self.modulators_for_reward(network, reward);
+        network.step_with_rng(stimuli, &modulators, rng)
     }
 
     /// Steps the network with explicit neuromodulators (e.g. from the limbic bridge).
@@ -115,6 +132,17 @@ impl PlasticityTrainer {
         modulators: &NeuroModulators,
     ) -> Result<Vec<usize>, StepError> {
         network.step(stimuli, modulators)
+    }
+
+    /// Same as [`Self::train_step_with_modulators`], with a caller-supplied RNG.
+    pub fn train_step_with_modulators_and_rng<R: Rng + ?Sized>(
+        &mut self,
+        network: &mut SpikingNetwork,
+        stimuli: &[f32],
+        modulators: &NeuroModulators,
+        rng: &mut R,
+    ) -> Result<Vec<usize>, StepError> {
+        network.step_with_rng(stimuli, modulators, rng)
     }
 
     /// Steps the network with a critic [`limbic_critic::ModulatorVector`].
@@ -163,20 +191,131 @@ impl PlasticityTrainer {
             let spikes = self
                 .train_step(network, &example.stimuli, example.reward)
                 .map_err(TrainerError::Step)?;
-            if !example.reward.is_nan() {
-                total_reward += example.reward;
-                valid_reward_count += 1;
-            }
-            summary.steps_processed += 1;
+            Self::accumulate_step(
+                &mut summary,
+                &mut total_reward,
+                &mut valid_reward_count,
+                example,
+                &spikes,
+            );
+        }
 
-            summary.total_spikes += spikes.len() as u64;
-            for &idx in &spikes {
-                if idx < summary.per_neuron_spikes.len() {
-                    summary.per_neuron_spikes[idx] += 1;
-                }
+        Ok(Self::finalize_summary(
+            summary,
+            network,
+            &initial_thresholds,
+            &initial_weights,
+            total_reward,
+            valid_reward_count,
+        ))
+    }
+
+    /// Replays a batch using a caller-supplied RNG for every network step.
+    ///
+    /// Identical to [`Self::run_session`] except stochastic input spikes are
+    /// drawn from `rng` instead of neuromod's thread-local generator. One RNG
+    /// stream is used for the whole batch — it is not reseeded per example.
+    ///
+    /// # Errors
+    ///
+    /// - [`TrainerError::EmptyBatch`] if `data` is empty.
+    /// - [`TrainerError::Step`] if any network step fails.
+    pub fn run_session_with_rng<R: Rng + ?Sized>(
+        &mut self,
+        network: &mut SpikingNetwork,
+        data: &[TrainingExample],
+        rng: &mut R,
+    ) -> Result<TrainingSummary, TrainerError> {
+        if data.is_empty() {
+            return Err(TrainerError::EmptyBatch);
+        }
+
+        let mut summary = TrainingSummary::default();
+        let initial_thresholds = network.get_thresholds();
+        let initial_weights: Vec<Vec<f32>> =
+            network.neurons.iter().map(|n| n.weights.clone()).collect();
+
+        summary.per_neuron_spikes = vec![0; network.neurons.len()];
+        let mut total_reward = 0.0;
+        let mut valid_reward_count = 0;
+
+        for example in data {
+            let spikes = self
+                .train_step_with_rng(network, &example.stimuli, example.reward, rng)
+                .map_err(TrainerError::Step)?;
+            Self::accumulate_step(
+                &mut summary,
+                &mut total_reward,
+                &mut valid_reward_count,
+                example,
+                &spikes,
+            );
+        }
+
+        Ok(Self::finalize_summary(
+            summary,
+            network,
+            &initial_thresholds,
+            &initial_weights,
+            total_reward,
+            valid_reward_count,
+        ))
+    }
+
+    /// Computes the modulator vector `train_step` would pass into `network.step`.
+    fn modulators_for_reward(&self, network: &SpikingNetwork, reward: f32) -> NeuroModulators {
+        let mut modulators: NeuroModulators = network.modulators;
+
+        // Skip modulation on NaN: f32::clamp returns NaN unchanged rather than
+        // panicking, so a NaN reward would otherwise propagate silently into
+        // modulators that poison subsequent STDP / homeostasis updates.
+        if self.config.use_reward_modulation && !reward.is_nan() {
+            // Positive reward shifts toward dopamine; negative toward norepinephrine
+            // (stress/arousal). neuromod replaced the former cortisol field with
+            // norepinephrine (see neuromod::NeuroModulators).
+            if reward > 0.0 {
+                modulators.dopamine = (modulators.dopamine + reward * 0.1).clamp(0.0, 1.0);
+                modulators.norepinephrine =
+                    (modulators.norepinephrine - reward * 0.05).clamp(0.0, 1.0);
+            } else {
+                modulators.norepinephrine =
+                    (modulators.norepinephrine - reward * 0.2).clamp(0.0, 1.0);
+                modulators.dopamine = (modulators.dopamine + reward * 0.1).clamp(0.0, 1.0);
             }
         }
 
+        modulators
+    }
+
+    fn accumulate_step(
+        summary: &mut TrainingSummary,
+        total_reward: &mut f32,
+        valid_reward_count: &mut u32,
+        example: &TrainingExample,
+        spikes: &[usize],
+    ) {
+        if !example.reward.is_nan() {
+            *total_reward += example.reward;
+            *valid_reward_count += 1;
+        }
+        summary.steps_processed += 1;
+
+        summary.total_spikes += spikes.len() as u64;
+        for &idx in spikes {
+            if idx < summary.per_neuron_spikes.len() {
+                summary.per_neuron_spikes[idx] += 1;
+            }
+        }
+    }
+
+    fn finalize_summary(
+        mut summary: TrainingSummary,
+        network: &SpikingNetwork,
+        initial_thresholds: &[f32],
+        initial_weights: &[Vec<f32>],
+        total_reward: f32,
+        valid_reward_count: u32,
+    ) -> TrainingSummary {
         summary.avg_reward = if valid_reward_count > 0 {
             total_reward / valid_reward_count as f32
         } else {
@@ -196,7 +335,7 @@ impl PlasticityTrainer {
             summary.weight_drifts.push(w_deltas);
         }
 
-        Ok(summary)
+        summary
     }
 }
 
@@ -339,12 +478,12 @@ mod tests {
         assert_eq!(summary.threshold_drifts.len(), network.neurons.len());
     }
 
-    // neuromod's `SpikingNetwork::step` only consults its thread-local RNG to
-    // decide, per channel, whether to stamp an input spike time — and only when
-    // `|stimulus| > 0.01` (see engine.rs). Below that magnitude, step() is a pure
-    // function of network state and inputs. There is no seed hook exposed through
-    // this crate (or neuromod) to make the above-threshold path reproducible, so
-    // these tests establish determinism on the sub-threshold path instead.
+    // neuromod's `SpikingNetwork::step` only consults RNG to decide, per channel,
+    // whether to stamp an input spike time — and only when `|stimulus| > 0.01`
+    // (see engine.rs). Below that magnitude, step() is a pure function of network
+    // state and inputs. These tests stay on that non-RNG path as a deterministic
+    // baseline. Above-threshold replay with a caller-injected RNG is covered in
+    // `crate::replay`.
 
     #[test]
     fn train_step_is_deterministic_for_subthreshold_stimuli() {

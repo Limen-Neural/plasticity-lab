@@ -8,7 +8,9 @@
 //! reward-modulated STDP primitives. `plasticity-lab` does not reimplement those
 //! primitives — it drives them through `neuromod`'s public API: single-step
 //! reward modulation via [`PlasticityTrainer::train_step`] and batch sessions via
-//! [`PlasticityTrainer::run_session`].
+//! [`PlasticityTrainer::run_session`]. Seeded replay uses
+//! [`PlasticityTrainer::train_step_with_rng`] / [`PlasticityTrainer::run_session_with_rng`]
+//! to inject a caller RNG into neuromod's stochastic input encoding.
 //!
 //! # Features
 //!
@@ -54,6 +56,9 @@
 
 pub mod config;
 pub mod trainer;
+
+#[cfg(test)]
+mod replay;
 
 #[cfg(feature = "critic")]
 pub mod bridge;

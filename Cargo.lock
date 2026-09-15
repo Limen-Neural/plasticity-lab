@@ -66,7 +66,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "neuromod"
 version = "0.6.0"
-source = "git+https://github.com/Limen-Neural/neuromod?branch=main#e424746b4d7a73ecfed2d5f0f18d5f464c1d5c57"
+source = "git+https://github.com/Limen-Neural/neuromod?branch=cursor%2Ffeat-rng-injection-cdc3#64a77d3c9c2f42df9bb1beb8229659459e4295d2"
 dependencies = [
  "rand",
  "serde",
@@ -78,6 +78,7 @@ version = "0.1.0"
 dependencies = [
  "limbic-critic",
  "neuromod",
+ "rand",
  "serde",
  "serde_json",
  "thiserror",

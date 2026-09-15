@@ -69,13 +69,36 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
-- Atomic batch preflight on `PlasticityTrainer::run_session`: every
-  `TrainingExample` is checked (stimulus length vs the network's `num_channels`,
-  finite stimuli, infinite reward) *before* the first `train_step`. A malformed
-  sample at index `N` now returns `TrainerError::InvalidSample { index, reason }`
-  (`SampleInvariant`) and leaves weights, eligibility traces, `global_step`,
-  modulators, and session metrics unchanged. Empty batches remain
-  `TrainerError::EmptyBatch`. Single-step APIs are unchanged (LIM-1220).
+- **Breaking:** atomic batch preflight on `PlasticityTrainer::run_session`:
+  every `TrainingExample` is checked (stimulus length vs the network's
+  `num_channels`, finite stimuli, infinite reward) *before* the first
+  `train_step`. A malformed sample at index `N` now returns
+  `TrainerError::InvalidSample { index, reason }` (`SampleInvariant`) and
+  leaves weights, eligibility traces, `global_step`, modulators, and session
+  metrics unchanged. Empty batches remain `TrainerError::EmptyBatch`.
+  Single-step APIs are unchanged (LIM-1220).
+
+  `TrainerError` is a public exhaustive enum, so adding `InvalidSample`
+  is a compile-breaking change for downstream `match` arms that listed only
+  `EmptyBatch` and `Step`.
+
+  **Migration:** handle the new variant (or a `_` wildcard) wherever you
+  match `TrainerError`:
+
+  ```rust
+  // Before
+  match err {
+      TrainerError::EmptyBatch => { /* ... */ }
+      TrainerError::Step(e) => { /* ... */ }
+  }
+
+  // After
+  match err {
+      TrainerError::EmptyBatch => { /* ... */ }
+      TrainerError::InvalidSample { index, reason } => { /* ... */ }
+      TrainerError::Step(e) => { /* ... */ }
+  }
+  ```
 - CI: Build & Test matrix on `ubuntu-latest`, `macos-latest`, and
   `windows-latest` (`fail-fast: false`). `cargo fmt --check` (OS-independent)
   and rustdoc stay Linux-only to save runner minutes; musl `cargo-deny`

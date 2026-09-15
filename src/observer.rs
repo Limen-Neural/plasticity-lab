@@ -56,7 +56,6 @@ pub(crate) struct NoopObserver;
 impl TrainingObserver for NoopObserver {
     type Error = core::convert::Infallible;
 
-    #[inline]
     fn on_step(&mut self, _event: TrainingStepEvent<'_>) -> Result<(), Self::Error> {
         Ok(())
     }
@@ -69,7 +68,6 @@ where
 {
     type Error = E;
 
-    #[inline]
     fn on_step(&mut self, event: TrainingStepEvent<'_>) -> Result<(), Self::Error> {
         self(event)
     }
@@ -126,5 +124,22 @@ mod tests {
         };
         observer.on_step(event).expect("closure observer");
         assert_eq!(seen, Some(3));
+    }
+
+    #[test]
+    fn noop_observer_on_step_is_ok() {
+        let mods = NeuroModulators::default();
+        let spikes: &[usize] = &[];
+        let event = TrainingStepEvent {
+            step_index: 0,
+            reward: 0.0,
+            modulators: &mods,
+            spike_indices: spikes,
+            steps_processed: 1,
+            total_spikes: 0,
+        };
+        NoopObserver
+            .on_step(event)
+            .expect("noop observer cannot fail");
     }
 }

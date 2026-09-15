@@ -731,18 +731,21 @@ mod tests {
             .run_session_with_observer(&mut network, &batch, &mut observer)
             .expect_err("observer failure");
 
-        match err {
+        match &err {
             TrainerError::Observer {
                 step_index,
                 steps_processed,
                 cause,
             } => {
-                assert_eq!(step_index, fail_at);
-                assert_eq!(steps_processed, fail_at + 1);
+                assert_eq!(*step_index, fail_at);
+                assert_eq!(*steps_processed, fail_at + 1);
                 assert!(cause.contains("injected observer failure"));
             }
             other => panic!("expected Observer error, got {other:?}"),
         }
+        let displayed = err.to_string();
+        assert!(displayed.contains("step 1"));
+        assert!(displayed.contains("injected observer failure"));
         assert_eq!(observer.seen, vec![0, 1]);
 
         // Network state matches a session that processed only examples 0..=N,
@@ -782,6 +785,23 @@ mod tests {
         assert_summaries_match(&summary_a, &summary_b);
         assert_networks_match(&network_a, &network_b);
         assert_eq!(observer.step_indices.len(), summary_a.steps_processed);
+    }
+
+    #[test]
+    fn run_session_with_closure_observer_records_step_indices() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let batch = subthreshold_batch();
+        let mut seen = Vec::new();
+        let mut observer = |event: TrainingStepEvent<'_>| -> Result<(), &'static str> {
+            seen.push(event.step_index);
+            Ok(())
+        };
+        let summary = trainer
+            .run_session_with_observer(&mut network, &batch, &mut observer)
+            .expect("closure observer session");
+        assert_eq!(seen, vec![0, 1, 2]);
+        assert_eq!(summary.steps_processed, 3);
     }
 
     #[test]

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::config::TrainingConfig;
-use crate::observer::{NoopObserver, TrainingObserver, TrainingStepEvent};
+use crate::observer::{TrainingObserver, TrainingStepEvent};
 use neuromod::{NeuroModulators, SpikingNetwork, StepError};
 use thiserror::Error;
 
@@ -168,7 +168,28 @@ impl PlasticityTrainer {
         network: &mut SpikingNetwork,
         data: &[TrainingExample],
     ) -> Result<TrainingSummary, TrainerError> {
-        self.run_session_generic(network, data, &mut NoopObserver, false)
+        let mut session = start_session(network, data)?;
+        let mut total_reward = 0.0;
+        let mut valid_reward_count = 0;
+
+        for example in data {
+            let spikes = self
+                .train_step(network, &example.stimuli, example.reward)
+                .map_err(TrainerError::Step)?;
+            accumulate_reward(example, &mut total_reward, &mut valid_reward_count);
+            session.summary.steps_processed += 1;
+            record_step_spikes(&mut session.summary, &spikes);
+        }
+
+        finish_summary(
+            &mut session.summary,
+            network,
+            &session.initial_thresholds,
+            &session.initial_weights,
+            total_reward,
+            valid_reward_count,
+        );
+        Ok(session.summary)
     }
 
     /// Replays a batch like [`Self::run_session`], notifying `observer` after
@@ -199,26 +220,7 @@ impl PlasticityTrainer {
         data: &[TrainingExample],
         observer: &mut O,
     ) -> Result<TrainingSummary, TrainerError> {
-        self.run_session_generic(network, data, observer, true)
-    }
-
-    fn run_session_generic<O: TrainingObserver>(
-        &mut self,
-        network: &mut SpikingNetwork,
-        data: &[TrainingExample],
-        observer: &mut O,
-        observe: bool,
-    ) -> Result<TrainingSummary, TrainerError> {
-        if data.is_empty() {
-            return Err(TrainerError::EmptyBatch);
-        }
-
-        let mut summary = TrainingSummary::default();
-        let initial_thresholds = network.get_thresholds();
-        let initial_weights: Vec<Vec<f32>> =
-            network.neurons.iter().map(|n| n.weights.clone()).collect();
-
-        summary.per_neuron_spikes = vec![0; network.neurons.len()];
+        let mut session = start_session(network, data)?;
         let mut total_reward = 0.0;
         let mut valid_reward_count = 0;
 
@@ -226,37 +228,72 @@ impl PlasticityTrainer {
             let spikes = self
                 .train_step(network, &example.stimuli, example.reward)
                 .map_err(TrainerError::Step)?;
-            if !example.reward.is_nan() {
-                total_reward += example.reward;
-                valid_reward_count += 1;
-            }
-            summary.steps_processed += 1;
-            record_step_spikes(&mut summary, &spikes);
-
-            if observe {
-                emit_step_event(
-                    observer,
-                    TrainingStepEvent {
+            accumulate_reward(example, &mut total_reward, &mut valid_reward_count);
+            session.summary.steps_processed += 1;
+            record_step_spikes(&mut session.summary, &spikes);
+            observer
+                .on_step(step_event(
+                    step_index,
+                    example.reward,
+                    &network.modulators,
+                    &spikes,
+                    session.summary.steps_processed,
+                    session.summary.total_spikes,
+                ))
+                .map_err(|cause| {
+                    observer_abort(
                         step_index,
-                        reward: example.reward,
-                        modulators: &network.modulators,
-                        spike_indices: &spikes,
-                        steps_processed: summary.steps_processed,
-                        total_spikes: summary.total_spikes,
-                    },
-                )?;
-            }
+                        session.summary.steps_processed,
+                        cause.to_string(),
+                    )
+                })?;
         }
 
         finish_summary(
-            &mut summary,
+            &mut session.summary,
             network,
-            &initial_thresholds,
-            &initial_weights,
+            &session.initial_thresholds,
+            &session.initial_weights,
             total_reward,
             valid_reward_count,
         );
-        Ok(summary)
+        Ok(session.summary)
+    }
+}
+
+struct SessionPrep {
+    summary: TrainingSummary,
+    initial_thresholds: Vec<f32>,
+    initial_weights: Vec<Vec<f32>>,
+}
+
+fn start_session(
+    network: &SpikingNetwork,
+    data: &[TrainingExample],
+) -> Result<SessionPrep, TrainerError> {
+    if data.is_empty() {
+        return Err(TrainerError::EmptyBatch);
+    }
+    let mut summary = TrainingSummary::default();
+    let initial_thresholds = network.get_thresholds();
+    let initial_weights: Vec<Vec<f32>> =
+        network.neurons.iter().map(|n| n.weights.clone()).collect();
+    summary.per_neuron_spikes = vec![0; network.neurons.len()];
+    Ok(SessionPrep {
+        summary,
+        initial_thresholds,
+        initial_weights,
+    })
+}
+
+fn accumulate_reward(
+    example: &TrainingExample,
+    total_reward: &mut f32,
+    valid_reward_count: &mut usize,
+) {
+    if !example.reward.is_nan() {
+        *total_reward += example.reward;
+        *valid_reward_count += 1;
     }
 }
 
@@ -269,19 +306,31 @@ fn record_step_spikes(summary: &mut TrainingSummary, spikes: &[usize]) {
     }
 }
 
-fn emit_step_event<O: TrainingObserver>(
-    observer: &mut O,
-    event: TrainingStepEvent<'_>,
-) -> Result<(), TrainerError> {
-    let step_index = event.step_index;
-    let steps_processed = event.steps_processed;
-    observer
-        .on_step(event)
-        .map_err(|cause| TrainerError::Observer {
-            step_index,
-            steps_processed,
-            cause: cause.to_string(),
-        })
+fn step_event<'a>(
+    step_index: usize,
+    reward: f32,
+    modulators: &'a NeuroModulators,
+    spike_indices: &'a [usize],
+    steps_processed: usize,
+    total_spikes: u64,
+) -> TrainingStepEvent<'a> {
+    TrainingStepEvent {
+        step_index,
+        reward,
+        modulators,
+        spike_indices,
+        steps_processed,
+        total_spikes,
+    }
+}
+
+#[inline(never)]
+fn observer_abort(step_index: usize, steps_processed: usize, cause: String) -> TrainerError {
+    TrainerError::Observer {
+        step_index,
+        steps_processed,
+        cause,
+    }
 }
 
 fn finish_summary(
@@ -944,30 +993,32 @@ mod tests {
     }
 
     #[test]
-    fn emit_step_event_maps_observer_error() {
-        let mods = NeuroModulators::default();
-        let spikes: &[usize] = &[];
-        let event = TrainingStepEvent {
-            step_index: 2,
-            reward: 0.0,
-            modulators: &mods,
-            spike_indices: spikes,
-            steps_processed: 3,
-            total_spikes: 0,
-        };
-        let mut fail = |_e: TrainingStepEvent<'_>| -> Result<(), &'static str> { Err("boom") };
-        let err = emit_step_event(&mut fail, event).expect_err("mapped");
-        match err {
+    fn observer_abort_preserves_step_index_and_cause() {
+        let err = observer_abort(2, 3, "boom".to_string());
+        match &err {
             TrainerError::Observer {
                 step_index,
                 steps_processed,
                 cause,
             } => {
-                assert_eq!(step_index, 2);
-                assert_eq!(steps_processed, 3);
+                assert_eq!(*step_index, 2);
+                assert_eq!(*steps_processed, 3);
                 assert_eq!(cause, "boom");
             }
             other => panic!("expected Observer error, got {other:?}"),
         }
+        assert!(err.to_string().contains("step 2"));
+    }
+
+    #[test]
+    fn step_event_copies_fields() {
+        let mods = NeuroModulators::default();
+        let spikes = [1usize];
+        let event = step_event(4, 0.5, &mods, &spikes, 5, 7);
+        assert_eq!(event.step_index, 4);
+        assert!((event.reward - 0.5).abs() < 1e-6);
+        assert_eq!(event.spike_indices, &spikes);
+        assert_eq!(event.steps_processed, 5);
+        assert_eq!(event.total_spikes, 7);
     }
 }

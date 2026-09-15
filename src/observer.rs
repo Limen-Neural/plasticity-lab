@@ -47,18 +47,22 @@ pub trait TrainingObserver {
     fn on_step(&mut self, event: TrainingStepEvent<'_>) -> Result<(), Self::Error>;
 }
 
-/// Zero-sized no-op used by [`crate::PlasticityTrainer::run_session`].
+/// Zero-sized observer that ignores every event.
 ///
-/// `on_step` is not invoked on that path (`observe = false`); this type
-/// exists so the shared generic loop type-checks without passing `()`.
+/// `run_session` does not construct or dispatch events; this type exists so tests
+/// can exercise [`TrainingObserver`] without a runtime callback.
+#[cfg(test)]
 pub(crate) struct NoopObserver;
 
+#[cfg(test)]
+#[inline(never)]
 pub(crate) fn discard_step_event(
     _event: TrainingStepEvent<'_>,
 ) -> Result<(), core::convert::Infallible> {
     Ok(())
 }
 
+#[cfg(test)]
 impl TrainingObserver for NoopObserver {
     type Error = core::convert::Infallible;
 

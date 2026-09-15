@@ -60,6 +60,8 @@ See also the ownership boundary with [SynapticDistill.jl](#boundary-with-synapti
 - A `Cargo.toml` that can pull git dependencies from GitHub
 - Optional: a VS Code Dev Container setup is included under `.devcontainer/`
 
+CI-tested platforms: Linux, macOS, and Windows (`ubuntu-latest`, `macos-latest`, `windows-latest` in `.github/workflows/ci.yml`). Formatting, `cargo deny`, rustdoc, and coverage (tarpaulin → Codecov) stay Linux-only.
+
 ### 1. Add the dependency
 
 ```toml
@@ -328,6 +330,8 @@ cargo test
 cargo test --all-features
 RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 ```
+
+GitHub Actions runs clippy, build, and test on Linux, macOS, and Windows. `cargo fmt --check`, `cargo deny`, rustdoc, and tarpaulin/Codecov stay Linux-only.
 
 ## License / REUSE
 

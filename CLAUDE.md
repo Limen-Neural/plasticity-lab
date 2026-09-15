@@ -64,7 +64,7 @@ One behavioral detail that isn't obvious from the public API alone:
 
 - Branch naming: `<type>/<short-description>` (e.g. `fix/trainer-panic`); commits are imperative mood, lowercase, concise.
 - All GitHub Actions in CI are pinned to commit SHAs, not mutable tags.
-- `REVIEW.md`'s own "must pass" checklist: `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test --all-features`, no new `unsafe`, no new dependency without justification in the PR description. That checklist is narrower than the actual `validate` CI job, though: `cargo deny --locked check` (license/advisory), `cargo doc --no-deps --all-features` (rustdoc warnings denied), and `cargo tarpaulin` are also ordinary failure-producing steps in the same job — any of them failing blocks the job (and the merge) even when every `REVIEW.md` item passes.
+- `REVIEW.md`'s own "must pass" checklist: `cargo fmt --check`, `cargo clippy --all-targets --all-features -- -D warnings`, `cargo test --all-features`, no new `unsafe`, no new dependency without justification in the PR description. That checklist is narrower than the actual `validate` CI job, though: `cargo deny --locked check` (license/advisory), `cargo doc --no-deps --all-features` (rustdoc warnings denied), and `cargo tarpaulin` are also ordinary failure-producing steps on the **Linux** matrix cell — any of them failing fails that cell (and the merge) even when every `REVIEW.md` item passes. `validate` itself is a three-OS matrix (`ubuntu-latest`, `macos-latest`, `windows-latest`, `fail-fast: false`); clippy/build/test run on every OS, while fmt/deny/doc/tarpaulin/Codecov stay Linux-only.
 
 ## v0.2 release context
 

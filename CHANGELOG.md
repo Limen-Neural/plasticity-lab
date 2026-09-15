@@ -69,6 +69,11 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- CI: Build & Test matrix on `ubuntu-latest`, `macos-latest`, and
+  `windows-latest` (`fail-fast: false`). `cargo fmt --check` (OS-independent)
+  and rustdoc stay Linux-only to save runner minutes; musl `cargo-deny`
+  stays Linux-only because the install is the musl Linux binary;
+  tarpaulin/Codecov stay Linux-only so coverage is not duplicated.
 - `bridge` module (`critic` feature): 1:1 adapter from `limbic-critic::ModulatorVector` to `neuromod::NeuroModulators` (`to_neuromodulators`, `from_neuromodulators`, `apply_modulator_vector`) (#17)
 - `PlasticityTrainer::train_step_with_modulators` for explicit neuromodulator steps
 - `PlasticityTrainer::train_step_from_critic` (`critic`) for critic vectors via the bridge

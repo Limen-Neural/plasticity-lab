@@ -83,8 +83,10 @@ Single Rust crate; part of the Limen-Neural ecosystem.
   commands already cover every distinct build (`--no-default-features` and
   `--features critic` would just repeat one of them) — add a
   `--no-default-features`/named-feature cell here if that ever changes
-- CI (`.github/workflows/ci.yml`) runs clippy, fmt, build, both `cargo test`
-  variants above, and tarpaulin coverage
+- CI (`.github/workflows/ci.yml`) runs clippy, build, and both `cargo test`
+  variants above on Linux, macOS, and Windows (`fail-fast: false`).
+  `cargo fmt --check`, `cargo deny`, rustdoc, and tarpaulin/Codecov stay
+  Linux-only (musl cargo-deny binary and tarpaulin ptrace).
 
 ## Git conventions
 

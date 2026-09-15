@@ -9,7 +9,7 @@ SPDX-PackageDownloadLocation = "https://github.com/Limen-Neural/plasticity-lab"
 
 # Source code — SPDX-License-Identifier already present in .rs files; aggregate copyright.
 [[annotations]]
-path = ["src/**"]
+path = ["src/**", "examples/**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Limen-Neural contributors"
 SPDX-License-Identifier = "MIT OR Apache-2.0"

@@ -69,6 +69,13 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Optional per-step session observer: `PlasticityTrainer::run_session_with_observer`
+  delivers a borrowed `TrainingStepEvent` (step index, reward, effective
+  modulators, spike indices, running counters) after each successful network
+  step. `run_session` stays the no-observer compatibility path and does not
+  construct events. Observer errors abort before the next step and report the
+  failing step index (`TrainerError::Observer`). JSONL serialization lives in
+  `examples/jsonl_session_observer.rs`, not in the library.
 - CI: Build & Test matrix on `ubuntu-latest`, `macos-latest`, and
   `windows-latest` (`fail-fast: false`). `cargo fmt --check` (OS-independent)
   and rustdoc stay Linux-only to save runner minutes; musl `cargo-deny`

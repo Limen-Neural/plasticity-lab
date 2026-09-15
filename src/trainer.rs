@@ -333,10 +333,26 @@ mod tests {
     }
 
     fn valid_example() -> TrainingExample {
+        example(8, 0.25, 0.2)
+    }
+
+    fn example(stimuli_len: usize, fill: f32, reward: f32) -> TrainingExample {
         TrainingExample {
-            stimuli: vec![0.25; 8],
-            reward: 0.2,
+            stimuli: vec![fill; stimuli_len],
+            reward,
         }
+    }
+
+    fn eligibility_values(network: &SpikingNetwork) -> Vec<Vec<f32>> {
+        network
+            .neurons
+            .iter()
+            .map(|n| n.eligibility.iter().map(|t| t.value).collect())
+            .collect()
+    }
+
+    fn weight_values(network: &SpikingNetwork) -> Vec<Vec<f32>> {
+        network.neurons.iter().map(|n| n.weights.clone()).collect()
     }
 
     #[test]
@@ -677,29 +693,14 @@ mod tests {
         let before = network_snapshot(&network);
         let config_before = trainer.config;
         let global_step_before = network.global_step;
-        let eligibility_before: Vec<Vec<f32>> = network
-            .neurons
-            .iter()
-            .map(|n| n.eligibility.iter().map(|t| t.value).collect())
-            .collect();
-        let weights_before: Vec<Vec<f32>> =
-            network.neurons.iter().map(|n| n.weights.clone()).collect();
+        let eligibility_before = eligibility_values(&network);
+        let weights_before = weight_values(&network);
 
         let batch = vec![
-            TrainingExample {
-                stimuli: vec![0.4; 8],
-                reward: 0.5,
-            },
-            TrainingExample {
-                stimuli: vec![0.6; 8],
-                reward: -0.2,
-            },
-            TrainingExample {
-                stimuli: vec![0.3; 3],
-                reward: 0.1,
-            },
+            example(8, 0.4, 0.5),
+            example(8, 0.6, -0.2),
+            example(3, 0.3, 0.1),
         ];
-
         let err = trainer
             .run_session(&mut network, &batch)
             .expect_err("late malformed sample must reject the batch");
@@ -718,24 +719,9 @@ mod tests {
             err.to_string(),
             "invalid training sample 2: stimulus length mismatch: expected 8, got 3"
         );
-
         assert_eq!(network.global_step, global_step_before);
-        assert_eq!(
-            network
-                .neurons
-                .iter()
-                .map(|n| n.eligibility.iter().map(|t| t.value).collect::<Vec<_>>())
-                .collect::<Vec<_>>(),
-            eligibility_before
-        );
-        assert_eq!(
-            network
-                .neurons
-                .iter()
-                .map(|n| n.weights.clone())
-                .collect::<Vec<_>>(),
-            weights_before
-        );
+        assert_eq!(eligibility_values(&network), eligibility_before);
+        assert_eq!(weight_values(&network), weights_before);
         assert_eq!(network_snapshot(&network), before);
         assert_eq!(trainer.config, config_before);
     }

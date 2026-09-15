@@ -8,8 +8,12 @@ on:
 
 jobs:
   validate:
-    name: Build & Test
-    runs-on: ubuntu-latest
+    name: Build & Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -31,13 +35,19 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: ${{ runner.os }}-cargo-
 
+      # rustfmt output is OS-independent; run once on Linux to save runner minutes
+      # (matches neuromod / axon-encoder).
       - name: Check formatting
+        if: runner.os == 'Linux'
         run: cargo fmt --check
 
       - name: Clippy (lint)
         run: cargo clippy --all-targets --all-features -- -D warnings
 
+      # cargo-deny is installed from the musl Linux binary; keep the license/
+      # advisory gate on Linux only (same reason tarpaulin stays Linux-only).
       - name: Cache cargo-deny
+        if: runner.os == 'Linux'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         id: cache-deny
         with:
@@ -45,7 +55,8 @@ jobs:
           key: ${{ runner.os }}-cargo-deny-0.20.2-musl
 
       - name: Install cargo-deny
-        if: steps.cache-deny.outputs.cache-hit != 'true'
+        if: runner.os == 'Linux' && steps.cache-deny.outputs.cache-hit != 'true'
+        shell: bash
         run: |
           set -euo pipefail
           DENY_VERSION=0.20.2
@@ -58,6 +69,7 @@ jobs:
 
       - name: Check licenses and advisories
         # --locked is a global cargo-deny flag (before subcommand)
+        if: runner.os == 'Linux'
         run: cargo deny --locked check
 
       - name: Build
@@ -76,11 +88,15 @@ jobs:
         run: cargo test --all-features
 
       - name: Docs
+        if: runner.os == 'Linux'
         run: cargo doc --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings
 
+      # cargo-tarpaulin relies on Linux ptrace; Codecov is already wired here —
+      # do not duplicate the upload on macOS/Windows.
       - name: Cache cargo-tarpaulin
+        if: runner.os == 'Linux'
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         id: cache-tarpaulin
         with:
@@ -88,13 +104,15 @@ jobs:
           key: ${{ runner.os }}-tarpaulin-0.31.3
 
       - name: Install cargo-tarpaulin
-        if: steps.cache-tarpaulin.outputs.cache-hit != 'true'
+        if: runner.os == 'Linux' && steps.cache-tarpaulin.outputs.cache-hit != 'true'
         run: cargo install cargo-tarpaulin --version 0.31.3
 
       - name: Generate coverage report
+        if: runner.os == 'Linux'
         run: cargo tarpaulin --all-features --all-targets --out xml --output-dir coverage
 
       - name: Upload coverage to Codecov
+        if: runner.os == 'Linux'
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f
         with:
           files: ./coverage/cobertura.xml

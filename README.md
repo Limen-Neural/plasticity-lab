@@ -214,7 +214,9 @@ fn main() {
 }
 ```
 
-Checkpointing is still application-owned. Persist the network (neuromod already serde's `SpikingNetwork`) together with the RNG state or the original seed and step count. This crate does not ingest replay files.
+A starting seed replays a session from the beginning given the same network checkpoint, config, and data. Mid-run resume needs the generator's already-advanced state, or a catch-up pass that replays every prior draw; reseeding from the original seed after a mid-session snapshot does not continue the same stream. `StdRng` traces are for a given `rand` version and target, not a portable cross-platform byte stream.
+
+Checkpointing is still application-owned. Persist the network (neuromod already serde's `SpikingNetwork`) together with that RNG state. This crate does not ingest replay files.
 
 `TrainingConfig` only exposes fields that drive an explicit code path in `train_step`. It does not expose a `learning_rate`, homeostasis setpoint, or `batch_size` knob: low-level STDP / homeostasis tuning is owned by `neuromod::SpikingNetwork`, which derives its own learning rate and thresholds from neuromodulator state, and batches are passed directly as `&[TrainingExample]` slices to `run_session` rather than configured. See `CHANGELOG.md` for the migration note if you are upgrading from a config that set those fields.
 

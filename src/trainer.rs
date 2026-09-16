@@ -215,6 +215,9 @@ impl PlasticityTrainer {
     /// Identical to [`Self::run_session`] except stochastic input spikes are
     /// drawn from `rng` instead of neuromod's thread-local generator. One RNG
     /// stream is used for the whole batch — it is not reseeded per example.
+    /// A starting seed replays from the beginning; a mid-session resume needs
+    /// that same generator already advanced through the prefix, not a fresh
+    /// seed on a deserialized checkpoint.
     ///
     /// # Errors
     ///

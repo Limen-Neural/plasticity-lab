@@ -66,7 +66,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "neuromod"
 version = "0.6.0"
-source = "git+https://github.com/Limen-Neural/neuromod?branch=cursor%2Ffeat-rng-injection-cdc3#64a77d3c9c2f42df9bb1beb8229659459e4295d2"
+source = "git+https://github.com/Limen-Neural/neuromod?branch=main#8fb85230f6a85ebf83f6bd4752591f33e2d731b0"
 dependencies = [
  "rand",
  "serde",

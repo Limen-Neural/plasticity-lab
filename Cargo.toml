@@ -46,8 +46,7 @@ rand = "0.10"
 # Git dependencies (track main until crates are published on crates.io).
 # neuromod main uses norepinephrine (not cortisol); limbic-critic main emits
 # ModulatorVector without a neuromod dependency — see src/bridge.rs.
-# Temporarily point at LIM-1221's caller-RNG branch until it merges to main.
-neuromod = { git = "https://github.com/Limen-Neural/neuromod", branch = "cursor/feat-rng-injection-cdc3" }
+neuromod = { git = "https://github.com/Limen-Neural/neuromod", branch = "main" }
 limbic-critic = { git = "https://github.com/Limen-Neural/limbic-critic", branch = "main", optional = true }
 
 [dev-dependencies]

@@ -1,0 +1,17 @@
+src/trainer.rs
+  2922d40a3310e911 257,266,268-269,294,303,312,314-315,396-552
+Cargo.lock
+  a5be578b8d7afec9 87
+README.md
+  2922d40a3310e911 286
+src/lib.rs
+  2922d40a3310e911 11-12
+AGENTS.md
+  2922d40a3310e911 59-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "a81bd2b1d7c4eb75a22111ab5d0bcb820a747ff4",
+  "prompts": {}
+}

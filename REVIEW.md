@@ -9,6 +9,8 @@ PR review standards for `plasticity-lab`. Applied by both automated bots and hum
 - [ ] `cargo fmt --check` — no formatting issues
 - [ ] `cargo clippy --all-targets --all-features -- -D warnings` — no warnings
 - [ ] `cargo test --all-features` — all tests green
+- [ ] Locked `wasm32-unknown-unknown` checks pass with `wasm-js`, both with and without `critic`
+- [ ] The feature tree contains `getrandom/wasm_js` only when `wasm-js` is enabled
 - [ ] No new `unsafe` blocks
 - [ ] No new dependencies without justification in PR description
 
@@ -24,6 +26,7 @@ PR review standards for `plasticity-lab`. Applied by both automated bots and hum
 
 - [ ] CHANGELOG entry for user-facing changes
 - [ ] README updated if public API changes
+- [ ] Browser and non-Web WebAssembly entropy guidance remains accurate when Cargo features change
 - [ ] Examples updated if usage patterns change
 
 ## Bot reviewer expectations

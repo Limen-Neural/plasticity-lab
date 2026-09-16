@@ -69,6 +69,12 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- Seeded replay: `PlasticityTrainer::train_step_with_rng`,
+  `train_step_with_modulators_and_rng`, and `run_session_with_rng` forward a
+  caller RNG into neuromod's stochastic input encoding so above-threshold
+  sessions are bit-identical across runs. `rand` is a direct dependency for
+  that public `Rng` bound. Sub-threshold `train_step` / `run_session` tests
+  remain as the non-RNG baseline.
 - An opt-in `wasm-js` feature forwards to `neuromod/wasm-js`, enabling the
   browser and Web Worker entropy backend without adding JavaScript bindings to
   default, native, or non-Web WebAssembly builds.
@@ -109,6 +115,7 @@ All notable changes to this project are documented in this file.
       TrainerError::Step(e) => { /* ... */ }
   }
   ```
+>>>>>>> main
 - CI: Build & Test matrix on `ubuntu-latest`, `macos-latest`, and
   `windows-latest` (`fail-fast: false`). `cargo fmt --check` (OS-independent)
   and rustdoc stay Linux-only to save runner minutes; musl `cargo-deny`

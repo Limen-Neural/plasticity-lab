@@ -56,11 +56,12 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Architecture
 
-- `src/trainer.rs` — core training loop (`PlasticityTrainer`, `run_session`, `run_session_with_observer`)
+- `src/trainer.rs` — core training loop (`PlasticityTrainer`, `run_session`, seeded `*_with_rng` variants, `run_session_with_observer`)
 - `src/observer.rs` — per-step session observer (`TrainingObserver`, `TrainingStepEvent`)
 - `src/config.rs` — configuration (`TrainingConfig`)
 - `src/bridge.rs` — adapter between `limbic-critic` and `neuromod` types (`critic` feature)
 - `src/lib.rs` — public API re-exports
+- `src/replay.rs` — test-only above-threshold replay coverage (not part of the public crate)
 - `plasticity-lab` owns SNN learning/training orchestration only — see the README's [Scope and ownership boundaries](README.md#scope-and-ownership-boundaries)
 - Neuron/network dynamics, neuromodulator state, and foundational (classical + reward-modulated) STDP primitives belong in `neuromod` — call/configure them through its public API rather than reimplementing them here
 - Reward shaping belongs in `limbic-critic`
@@ -96,8 +97,11 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Dependencies
 
-- Allowed production deps: `neuromod`, `limbic-critic` (`critic` feature only), `serde`, `thiserror`
-- `serde_json` is a dev-dependency only (used by `config.rs` tests) — do not promote it to `[dependencies]` without a real runtime use
-- `axon-encoder`, `rand`, and `tracing` were removed from the dependency graph (#67): none had any code consuming them. Do not re-add a dependency solely to make Cargo resolve a sibling crate or "for later" — add it when there's a concrete, tested API surface that needs it
+- Allowed production deps: `neuromod`, `limbic-critic` (`critic` feature only), `serde`, `thiserror`, `rand` (caller-injected RNG for seeded replay)
+- `serde_json` is a dev-dependency only (used by `config.rs` and replay-manifest tests) — do not promote it to `[dependencies]` without a real runtime use
+- `axon-encoder`, `rand`, and `tracing` were previously unused (#67). `rand`
+  is now a production dependency because `train_step_with_rng` /
+  `run_session_with_rng` take `&mut impl rand::Rng`. Do not re-add
+  `axon-encoder` or `tracing` solely to make Cargo resolve a sibling crate.
 - Git deps track `branch = "main"` in `Cargo.toml` (not a `rev` pin); `Cargo.lock` records the currently-resolved commit until `cargo update` bumps it. This intentionally stays a git dependency until `neuromod`/`limbic-critic` are published on crates.io — do not replace it with another mutable git ref as a way to appear crates.io-ready
 - Do not add domain-specific or framework-heavy dependencies

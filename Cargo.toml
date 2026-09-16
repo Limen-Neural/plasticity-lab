@@ -38,6 +38,10 @@ all-features = true
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "2.0"
+# Seeded replay: `train_step_with_rng` / `run_session_with_rng` take
+# `&mut impl rand::Rng` and forward it to neuromod's caller-injected step.
+# Same major as neuromod's `rand` so the traits line up.
+rand = "0.10"
 
 # Git dependencies (track main until crates are published on crates.io).
 # neuromod main uses norepinephrine (not cortisol); limbic-critic main emits

@@ -75,12 +75,9 @@ jobs:
       - name: Build
         run: cargo build --all-features
 
-      # `critic` is currently the crate's only optional feature and
-      # `default = []`, so `--no-default-features`/plain `cargo test` are
-      # identical builds, and so are `--features critic`/`--all-features` —
-      # running all four would just recompile+retest the same two
-      # configurations twice per PR. Revisit if a second optional feature
-      # is ever added.
+      # Native CI covers the default and combined all-feature configurations.
+      # The dedicated Browser WASM job separately checks `wasm-js`,
+      # `critic,wasm-js`, and the enabled/disabled entropy feature tree.
       - name: Test (default features)
         run: cargo test
 

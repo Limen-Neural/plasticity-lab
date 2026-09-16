@@ -56,7 +56,8 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Architecture
 
-- `src/trainer.rs` — core training loop (`PlasticityTrainer`, `run_session`)
+- `src/trainer.rs` — core training loop (`PlasticityTrainer`, `run_session`, `run_session_with_observer`)
+- `src/observer.rs` — per-step session observer (`TrainingObserver`, `TrainingStepEvent`)
 - `src/config.rs` — configuration (`TrainingConfig`)
 - `src/bridge.rs` — adapter between `limbic-critic` and `neuromod` types (`critic` feature)
 - `src/lib.rs` — public API re-exports

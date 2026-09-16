@@ -1,0 +1,15 @@
+README.md
+  9e69eb8d427bc4b0 246-247
+CLAUDE.md
+  9e69eb8d427bc4b0 48
+src/trainer.rs
+  e1ed9f2dc954c26d 1341
+  fddb512c451cea59 323
+  9e69eb8d427bc4b0 104,1054,1071-1081
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "0c08fcdb70958e3db72dbc2b2990d934834a6756",
+  "prompts": {}
+}

@@ -290,7 +290,7 @@ impl PlasticityTrainer {
         modulators
     }
 
-    fn accumulate_step(
+    pub(crate) fn accumulate_step(
         summary: &mut TrainingSummary,
         total_reward: &mut f32,
         valid_reward_count: &mut u32,
@@ -311,7 +311,7 @@ impl PlasticityTrainer {
         }
     }
 
-    fn finalize_summary(
+    pub(crate) fn finalize_summary(
         mut summary: TrainingSummary,
         network: &SpikingNetwork,
         initial_thresholds: &[f32],

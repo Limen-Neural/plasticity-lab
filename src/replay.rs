@@ -37,7 +37,12 @@ struct ExperimentManifest {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct DependencyRef {
     git: String,
+    /// Mutable `Cargo.toml` branch pin (`branch = "main"`).
     branch: String,
+    /// Immutable revision copied from Cargo.lock (`source = git+...#REV`).
+    rev: String,
+    /// `rand` version that produced `StdRng` draws (not portable across versions).
+    rand_version: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -72,6 +77,8 @@ fn example_manifest(seed: u64, spec: NetworkSpec, training: TrainingConfig) -> E
         neuromod: DependencyRef {
             git: "https://github.com/Limen-Neural/neuromod".to_string(),
             branch: "main".to_string(),
+            rev: cargo_lock_neuromod_rev().to_string(),
+            rand_version: "0.10".to_string(),
         },
         training,
         network: spec,
@@ -151,32 +158,37 @@ fn capture_tick(tick: usize, spikes: &[usize], network: &SpikingNetwork) -> Tick
     }
 }
 
+fn cargo_lock_neuromod_rev() -> &'static str {
+    const LOCK: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.lock"));
+    LOCK.split("name = \"neuromod\"")
+        .nth(1)
+        .and_then(|rest| {
+            rest.lines().find_map(|line| {
+                line.strip_prefix("source = \"")?
+                    .rsplit_once('#')?
+                    .1
+                    .strip_suffix('"')
+            })
+        })
+        .expect("neuromod git source pin in Cargo.lock")
+}
+
 fn first_diverging_field(left: &TickTrace, right: &TickTrace) -> Option<&'static str> {
-    if left.tick != right.tick {
-        return Some("tick");
-    }
-    if left.global_step != right.global_step {
-        return Some("global_step");
-    }
-    if left.spikes != right.spikes {
-        return Some("spikes");
-    }
-    if left.input_spike_times != right.input_spike_times {
-        return Some("input_spike_times");
-    }
-    if left.thresholds != right.thresholds {
-        return Some("thresholds");
-    }
-    if left.weights != right.weights {
-        return Some("weights");
-    }
-    if left.eligibility != right.eligibility {
-        return Some("eligibility");
-    }
-    if left.modulators != right.modulators {
-        return Some("modulators");
-    }
-    None
+    [
+        ("tick", left.tick != right.tick),
+        ("global_step", left.global_step != right.global_step),
+        ("spikes", left.spikes != right.spikes),
+        (
+            "input_spike_times",
+            left.input_spike_times != right.input_spike_times,
+        ),
+        ("thresholds", left.thresholds != right.thresholds),
+        ("weights", left.weights != right.weights),
+        ("eligibility", left.eligibility != right.eligibility),
+        ("modulators", left.modulators != right.modulators),
+    ]
+    .into_iter()
+    .find_map(|(field, diverged)| diverged.then_some(field))
 }
 
 fn assert_ticks_identical(left: &[TickTrace], right: &[TickTrace]) {
@@ -228,7 +240,6 @@ fn run_recorded_session(
     let mut network = seeded_network(spec.num_lif, spec.num_izh, spec.num_channels);
     let mut rng = StdRng::seed_from_u64(seed);
     let mut ticks = Vec::with_capacity(batch.len());
-
     let initial_thresholds = network.get_thresholds();
     let initial_weights: Vec<Vec<f32>> =
         network.neurons.iter().map(|n| n.weights.clone()).collect();
@@ -244,39 +255,25 @@ fn run_recorded_session(
             .train_step_with_rng(&mut network, &example.stimuli, example.reward, &mut rng)
             .expect("seeded step");
         ticks.push(capture_tick(tick, &spikes, &network));
-        if !example.reward.is_nan() {
-            total_reward += example.reward;
-            valid_reward_count += 1;
-        }
-        summary.steps_processed += 1;
-        summary.total_spikes += spikes.len() as u64;
-        for &idx in &spikes {
-            if idx < summary.per_neuron_spikes.len() {
-                summary.per_neuron_spikes[idx] += 1;
-            }
-        }
-    }
-
-    summary.avg_reward = if valid_reward_count > 0 {
-        total_reward / valid_reward_count as f32
-    } else {
-        0.0
-    };
-    let final_thresholds = network.get_thresholds();
-    for i in 0..network.neurons.len() {
-        summary
-            .threshold_drifts
-            .push(final_thresholds[i] - initial_thresholds[i]);
-        let mut w_deltas = Vec::new();
-        for (ch, &w) in network.neurons[i].weights.iter().enumerate() {
-            w_deltas.push(w - initial_weights[i][ch]);
-        }
-        summary.weight_drifts.push(w_deltas);
+        PlasticityTrainer::accumulate_step(
+            &mut summary,
+            &mut total_reward,
+            &mut valid_reward_count,
+            example,
+            &spikes,
+        );
     }
 
     SessionOutcome {
+        summary: PlasticityTrainer::finalize_summary(
+            summary,
+            &network,
+            &initial_thresholds,
+            &initial_weights,
+            total_reward,
+            valid_reward_count,
+        ),
         network,
-        summary,
         ticks,
     }
 }
@@ -325,6 +322,8 @@ fn experiment_manifest_round_trips_seed_and_dependency_versions() {
         restored.neuromod.git,
         "https://github.com/Limen-Neural/neuromod"
     );
+    assert_eq!(restored.neuromod.rev, cargo_lock_neuromod_rev());
+    assert_eq!(restored.neuromod.rand_version, "0.10");
     assert!(json.contains("\"seed\""));
     assert!(json.contains("plasticity_lab_version"));
 }

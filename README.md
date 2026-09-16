@@ -139,11 +139,12 @@ plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", featu
 **When to enable `wasm-js`:** your `wasm32-unknown-unknown` application runs
 in a browser or Web Worker and should obtain entropy through JavaScript. The
 feature only forwards to `neuromod/wasm-js`; it does not change this crate's
-training, reward, plasticity, critic, observer, or RNG semantics. It is not a
-default because JavaScript bindings are inappropriate for native consumers and
-for non-Web WebAssembly hosts. Consumers targeting WASI or another non-Web
-host must leave `wasm-js` disabled and select an entropy backend suitable for
-their runtime.
+training, reward, plasticity, critic, or observer APIs, but it does change the
+entropy source used by `neuromod`'s thread-local RNG to the JavaScript backend.
+It is not a default because JavaScript bindings are inappropriate for native
+consumers and for non-Web WebAssembly hosts. Consumers targeting WASI or
+another non-Web host must leave `wasm-js` disabled and select an entropy
+backend suitable for their runtime.
 
 Exercise the native configurations locally:
 

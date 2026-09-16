@@ -44,7 +44,9 @@ Source layout (`src/`):
   - `train_step` — applies scalar-reward → neuromodulator shift, then steps the network
   - `train_step_with_modulators` — steps with explicit `NeuroModulators`, no reward math
   - `train_step_from_critic` (`critic` feature only) — converts a `limbic_critic::ModulatorVector` via `bridge`, then calls `train_step_with_modulators`
-  - `run_session` — snapshots per-neuron thresholds/weights before the batch, replays `train_step` over each `TrainingExample`, and diffs against the snapshot to build `TrainingSummary` (`threshold_drifts`, `weight_drifts`, `per_neuron_spikes`, `avg_reward`)
+  - `run_session` — admits the whole batch first (dimensions, finite stimuli, infinite reward) so a late invalid sample cannot leave earlier samples applied; then snapshots per-neuron thresholds/weights, replays `train_step` over each `TrainingExample`, and diffs against the snapshot to build `TrainingSummary` (`threshold_drifts`, `weight_drifts`, `per_neuron_spikes`, `avg_reward`)
+  - `run_session_with_observer` — same preflight and loop, plus one borrowed `TrainingStepEvent` after each successful step; observer `Err` aborts before the next example (`TrainerError::Observer`)
+- `observer.rs` — `TrainingObserver` trait and borrowed `TrainingStepEvent` (no mutable network access)
 - `config.rs` — `TrainingConfig`; always deserializes via `#[serde(default)]` on the struct so partial/old configs stay forward-compatible
 - `bridge.rs` — `to_neuromodulators`/`from_neuromodulators` are pure conversions between `limbic_critic::ModulatorVector` and `neuromod::NeuroModulators`, matched by field *name* (`dopamine: v.dopamine`, etc.) — a named-field struct literal is immune to reordering, so the risk after bumping either sibling dependency isn't a reordered field, it's a field being renamed/removed (a compile error, so it's caught) or a same-named field's meaning quietly changing (not caught by the compiler — re-verify semantics, not just presence). `apply_modulator_vector` is not pure: it takes `&mut SpikingNetwork` and calls `network.step(...)`, so it's the one side-effecting entry point in this module.
 

@@ -75,12 +75,9 @@ jobs:
       - name: Build
         run: cargo build --all-features
 
-      # `critic` is currently the crate's only optional feature and
-      # `default = []`, so `--no-default-features`/plain `cargo test` are
-      # identical builds, and so are `--features critic`/`--all-features` —
-      # running all four would just recompile+retest the same two
-      # configurations twice per PR. Revisit if a second optional feature
-      # is ever added.
+      # Native CI covers the default and combined all-feature configurations.
+      # The dedicated Browser WASM job separately checks `wasm-js`,
+      # `critic,wasm-js`, and the enabled/disabled entropy feature tree.
       - name: Test (default features)
         run: cargo test
 
@@ -152,3 +149,48 @@ jobs:
 
       - name: Test at MSRV
         run: cargo +1.98.1 test --locked --all-features
+
+  browser-wasm:
+    name: Browser WASM
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Install Rust 1.98.1 with the WASM target
+        uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # pinned action
+        with:
+          toolchain: 1.98.1
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo registry
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-browser-wasm-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-browser-wasm-
+
+      - name: Check browser WASM
+        run: cargo +1.98.1 check --locked --target wasm32-unknown-unknown --no-default-features --features wasm-js
+
+      - name: Check browser WASM with critic
+        run: cargo +1.98.1 check --locked --target wasm32-unknown-unknown --no-default-features --features critic,wasm-js
+
+      - name: Verify browser entropy feature is opt-in
+        shell: bash
+        run: |
+          set -euo pipefail
+          enabled="$(cargo +1.98.1 tree --locked --target wasm32-unknown-unknown --no-default-features --features wasm-js -e features -i getrandom)"
+          disabled="$(cargo +1.98.1 tree --locked --target wasm32-unknown-unknown --no-default-features -e features -i getrandom)"
+
+          grep -F 'getrandom feature "wasm_js"' <<<"${enabled}"
+          if grep -F 'getrandom feature "wasm_js"' <<<"${disabled}"; then
+            echo "getrandom/wasm_js must not be enabled without plasticity-lab/wasm-js" >&2
+            exit 1
+          fi

@@ -56,7 +56,8 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Architecture
 
-- `src/trainer.rs` — core training loop (`PlasticityTrainer`, `run_session`, seeded `*_with_rng` variants)
+- `src/trainer.rs` — core training loop (`PlasticityTrainer`, `run_session`, seeded `*_with_rng` variants, `run_session_with_observer`)
+- `src/observer.rs` — per-step session observer (`TrainingObserver`, `TrainingStepEvent`)
 - `src/config.rs` — configuration (`TrainingConfig`)
 - `src/bridge.rs` — adapter between `limbic-critic` and `neuromod` types (`critic` feature)
 - `src/lib.rs` — public API re-exports
@@ -79,11 +80,9 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 - Unit tests in `src/` alongside source files
 - Critic-bridge tests require `--features critic` or `--all-features`
-- Run before pushing: `cargo test && cargo test --all-features`. `critic` is
-  currently the crate's only optional feature and `default = []`, so these two
-  commands already cover every distinct build (`--no-default-features` and
-  `--features critic` would just repeat one of them) — add a
-  `--no-default-features`/named-feature cell here if that ever changes
+- Run before pushing: `cargo test && cargo test --all-features`. Keep
+  `default = []`; the opt-in `wasm-js` feature is covered separately by the
+  locked `wasm32-unknown-unknown` CI checks, with and without `critic`.
 - CI (`.github/workflows/ci.yml`) runs clippy, build, and both `cargo test`
   variants above on Linux, macOS, and Windows (`fail-fast: false`).
   `cargo fmt --check`, `cargo deny`, rustdoc, and tarpaulin/Codecov stay

@@ -66,7 +66,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "neuromod"
 version = "0.6.0"
-source = "git+https://github.com/Limen-Neural/neuromod?branch=main#e424746b4d7a73ecfed2d5f0f18d5f464c1d5c57"
+source = "git+https://github.com/Limen-Neural/neuromod?branch=main#3fe526116683d7392e309760c017afe8a934619c"
 dependencies = [
  "rand",
  "serde",

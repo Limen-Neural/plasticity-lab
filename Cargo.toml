@@ -53,6 +53,9 @@ default = []
 # Critic → neuromodulator bridge (src/bridge.rs). Named for the concrete
 # capability it enables, not a vague "integration" bundle — see #67.
 critic = ["dep:limbic-critic"]
+# Browser and Web Worker entropy backend. This remains opt-in so non-Web
+# WebAssembly and native consumers can select an appropriate backend themselves.
+wasm-js = ["neuromod/wasm-js"]
 
 [workspace]
 

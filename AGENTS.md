@@ -79,11 +79,9 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 - Unit tests in `src/` alongside source files
 - Critic-bridge tests require `--features critic` or `--all-features`
-- Run before pushing: `cargo test && cargo test --all-features`. `critic` is
-  currently the crate's only optional feature and `default = []`, so these two
-  commands already cover every distinct build (`--no-default-features` and
-  `--features critic` would just repeat one of them) — add a
-  `--no-default-features`/named-feature cell here if that ever changes
+- Run before pushing: `cargo test && cargo test --all-features`. Keep
+  `default = []`; the opt-in `wasm-js` feature is covered separately by the
+  locked `wasm32-unknown-unknown` CI checks, with and without `critic`.
 - CI (`.github/workflows/ci.yml`) runs clippy, build, and both `cargo test`
   variants above on Linux, macOS, and Windows (`fail-fast: false`).
   `cargo fmt --check`, `cargo deny`, rustdoc, and tarpaulin/Codecov stay

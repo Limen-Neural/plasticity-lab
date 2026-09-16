@@ -119,6 +119,7 @@ To pull in `limbic-critic` as an optional dep and enable the critic → neuromod
 |---------|----------|-----------------|
 | *(none)* / default | yes | Core loop only: depends on `neuromod` + serde/thiserror |
 | `critic` | no | Optional dep on `limbic-critic`, plus the `bridge` module that converts `limbic_critic::ModulatorVector` into `neuromod::NeuroModulators` |
+| `wasm-js` | no | Forwards to `neuromod/wasm-js`, selecting `getrandom`'s JavaScript entropy backend for browsers and Web Workers |
 
 ```toml
 # Core only (recommended first step)
@@ -126,19 +127,34 @@ plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab" }
 
 # With the critic bridge
 plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", features = ["critic"] }
+
+# In a browser or Web Worker (combine with `critic` when needed)
+plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", features = ["wasm-js"] }
 ```
 
 **When to use default:** you already shape rewards and encode inputs yourself (or use plain `f32` stimuli and scalar rewards, as in the getting-started example). This includes any input-encoding needs — `axon-encoder` is a standalone sibling crate you wire in yourself; this crate never depends on it (see [Architecture brief](#architecture-brief)).
 
 **When to enable `critic`:** you want Cargo to resolve `limbic-critic` alongside this crate and use the `bridge` adapter to turn a `ModulatorVector` into a training step via `train_step_from_critic`/`apply_modulator_vector`. The core trainer API does not require the feature; it always takes precomputed `stimuli: &[f32]` and `reward: f32`.
 
-Exercise both configurations locally (this is also what CI runs — `critic` is
-currently the only optional feature, so these two cover every distinct build):
+**When to enable `wasm-js`:** your `wasm32-unknown-unknown` application runs
+in a browser or Web Worker and should obtain entropy through JavaScript. The
+feature only forwards to `neuromod/wasm-js`; it does not change this crate's
+training, reward, plasticity, critic, observer, or RNG semantics. It is not a
+default because JavaScript bindings are inappropriate for native consumers and
+for non-Web WebAssembly hosts. Consumers targeting WASI or another non-Web
+host must leave `wasm-js` disabled and select an entropy backend suitable for
+their runtime.
+
+Exercise the native configurations locally:
 
 ```bash
 cargo test
 cargo test --all-features
 ```
+
+CI additionally checks the opt-in browser configurations, both with and
+without `critic`, against `wasm32-unknown-unknown` using the lockfile. It also
+verifies that `getrandom/wasm_js` appears only when `wasm-js` is enabled.
 
 ## Common patterns
 

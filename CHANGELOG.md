@@ -69,6 +69,9 @@ All notable changes to this project are documented in this file.
 
 ### Added
 
+- An opt-in `wasm-js` feature forwards to `neuromod/wasm-js`, enabling the
+  browser and Web Worker entropy backend without adding JavaScript bindings to
+  default, native, or non-Web WebAssembly builds.
 - Optional per-step session observer: `PlasticityTrainer::run_session_with_observer`
   delivers a borrowed `TrainingStepEvent` (step index, reward, effective
   modulators, spike indices, running counters) after each successful network

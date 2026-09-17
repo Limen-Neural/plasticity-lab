@@ -103,23 +103,32 @@ in the registry.
 After every qualification step passes, update the release-status wording in
 `README.md`, `CHANGELOG.md`, `CLAUDE.md`, and this guide from `Unpublished
 release candidate` to the planned publication date. Commit those changes and
-rerun the package checks on the final dated commit. If publication fails,
-restore the candidate wording.
-
-Before publishing, return to the original clean checkout and verify that the
-**final dated commit** is the commit on `origin/main`:
+merge the final dated commit onto `main`. Rerun steps 2–5 from that `main`
+checkout, including the package and archive checks, then record the qualified
+commit immediately afterward:
 
 ```bash
-cd "$release_repo"
-git fetch origin main
-test "$(git branch --show-current)" = "main"
-git pull --ff-only origin main
-test -z "$(git status --porcelain)"
-release_commit=$(git rev-parse HEAD)
-test "$release_commit" = "$(git rev-parse origin/main)"
-cargo publish
-git tag -s v0.2.0 "$release_commit" -m "v0.2.0"
-git push origin v0.2.0
+qualified_commit=$(git -C "$release_repo" rev-parse HEAD)
+```
+
+If publication fails, restore the candidate wording.
+
+Before publishing, return to the original clean checkout and verify that the
+**final dated commit** has not moved locally or on `origin/main`:
+
+```bash
+(
+  set -euo pipefail
+  cd "$release_repo"
+  git fetch origin main
+  test "$(git branch --show-current)" = "main"
+  test -z "$(git status --porcelain)"
+  test "$(git rev-parse HEAD)" = "$qualified_commit"
+  test "$(git rev-parse origin/main)" = "$qualified_commit"
+  cargo publish --locked --all-features
+  git tag -s v0.2.0 "$qualified_commit" -m "v0.2.0"
+  git push origin v0.2.0
+)
 ```
 
 Finally, verify the crates.io page and the docs.rs build with all features,

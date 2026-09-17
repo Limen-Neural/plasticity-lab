@@ -118,7 +118,7 @@ To pull in `limbic-critic` as an optional dep and enable the critic → neuromod
 
 | Feature | Default? | What it enables |
 |---------|----------|-----------------|
-| *(none)* / default | yes | Core loop only: depends on `neuromod` + serde/thiserror |
+| *(none)* / default | yes | Core loop only: depends on `neuromod` + serde/thiserror/rand |
 | `critic` | no | Optional dep on `limbic-critic`, plus the `bridge` module that converts `limbic_critic::ModulatorVector` into `neuromod::NeuroModulators` |
 | `wasm-js` | no | Forwards to `neuromod/wasm-js`, selecting `getrandom`'s JavaScript entropy backend for browsers and Web Workers |
 

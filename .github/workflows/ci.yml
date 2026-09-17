@@ -98,6 +98,7 @@ jobs:
         run: |
           set -euo pipefail
           cargo package --locked --list --all-features
+          cargo package --locked --all-features
           cargo publish --dry-run --locked --all-features
           # Test the archive Cargo actually prepared, outside the checkout.
           package_dir="$(mktemp -d)"

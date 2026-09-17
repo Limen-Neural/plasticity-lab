@@ -117,6 +117,11 @@ The release date will be assigned when `0.2.0` is published to crates.io.
       TrainerError::EmptyBatch => { /* ... */ }
       TrainerError::InvalidSample { index, reason } => { /* ... */ }
       TrainerError::Step(e) => { /* ... */ }
+      TrainerError::Observer {
+          step_index,
+          steps_processed,
+          cause,
+      } => { /* ... */ }
   }
   ```
 - CI: Build & Test matrix on `ubuntu-latest`, `macos-latest`, and

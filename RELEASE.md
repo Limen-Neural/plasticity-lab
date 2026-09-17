@@ -6,6 +6,14 @@ it as published until `cargo publish` succeeds. The pre-publish final commit
 may carry a planned publication date; it becomes the release date only after a
 successful publish.
 
+Capture the release checkout before running any step:
+
+```bash
+release_repo=$(git rev-parse --show-toplevel)
+cd "$release_repo"
+test -z "$(git status --porcelain)"
+```
+
 ## 1. Confirm the release manifest
 
 The release candidate must use the published registry dependencies:
@@ -60,9 +68,11 @@ package_stem=$(cargo metadata --no-deps --format-version 1 | \
   jq -r '.packages[] | select(.name == "plasticity-lab") | "\(.name)-\(.version)"')
 release_tmp=$(mktemp -d)
 tar -xzf "$archive_dir/$package_stem.crate" -C "$release_tmp"
-cd "$release_tmp/$package_stem"
-cargo test --locked
-cargo test --locked --all-features
+(
+  cd "$release_tmp/$package_stem"
+  cargo test --locked
+  cargo test --locked --all-features
+)
 ```
 
 The archive tests catch files that compiled in the repository but were omitted
@@ -90,15 +100,25 @@ in the registry.
 
 ## 6. Set the final date and publish
 
-After every qualification step passes, land the exact release commit on
-`main`. Update `CHANGELOG.md` from `Unpublished release candidate` to the
-planned publication date, commit that change, and rerun the package checks on
-the final commit. If publication fails, restore the candidate wording. Then
-publish and tag the published commit:
+After every qualification step passes, update the release-status wording in
+`README.md`, `CHANGELOG.md`, `CLAUDE.md`, and this guide from `Unpublished
+release candidate` to the planned publication date. Commit those changes and
+rerun the package checks on the final dated commit. If publication fails,
+restore the candidate wording.
+
+Before publishing, return to the original clean checkout and verify that the
+**final dated commit** is the commit on `origin/main`:
 
 ```bash
+cd "$release_repo"
+git fetch origin main
+test "$(git branch --show-current)" = "main"
+git pull --ff-only origin main
+test -z "$(git status --porcelain)"
+release_commit=$(git rev-parse HEAD)
+test "$release_commit" = "$(git rev-parse origin/main)"
 cargo publish
-git tag -s v0.2.0 -m "v0.2.0"
+git tag -s v0.2.0 "$release_commit" -m "v0.2.0"
 git push origin v0.2.0
 ```
 

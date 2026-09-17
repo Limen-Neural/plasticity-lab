@@ -36,12 +36,12 @@ struct ExperimentManifest {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct DependencyRef {
-    git: String,
-    /// Mutable `Cargo.toml` branch pin (`branch = "main"`).
-    branch: String,
-    /// Immutable revision copied from Cargo.lock (`source = git+...#REV`).
-    rev: String,
-    /// `rand` version that produced `StdRng` draws (not portable across versions).
+    /// Exact registry version and source from Cargo.lock.
+    version: String,
+    source: String,
+    /// Registry archive checksum, identifying the immutable dependency artifact.
+    checksum: String,
+    /// Exact `rand` version that produced `StdRng` draws (not portable across versions).
     rand_version: String,
 }
 
@@ -75,10 +75,10 @@ fn example_manifest(seed: u64, spec: NetworkSpec, training: TrainingConfig) -> E
         seed,
         plasticity_lab_version: env!("CARGO_PKG_VERSION").to_string(),
         neuromod: DependencyRef {
-            git: "https://github.com/Limen-Neural/neuromod".to_string(),
-            branch: "main".to_string(),
-            rev: cargo_lock_neuromod_rev().to_string(),
-            rand_version: "0.10".to_string(),
+            version: cargo_lock_field("neuromod", "version").to_string(),
+            source: cargo_lock_field("neuromod", "source").to_string(),
+            checksum: cargo_lock_field("neuromod", "checksum").to_string(),
+            rand_version: cargo_lock_field("rand", "version").to_string(),
         },
         training,
         network: spec,
@@ -158,19 +158,20 @@ fn capture_tick(tick: usize, spikes: &[usize], network: &SpikingNetwork) -> Tick
     }
 }
 
-fn cargo_lock_neuromod_rev() -> &'static str {
+// Cargo writes string fields one per line. Keep lookups within one package so
+// a missing checksum cannot accidentally come from the following dependency.
+fn cargo_lock_field(package: &str, field: &str) -> &'static str {
     const LOCK: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.lock"));
-    LOCK.split("name = \"neuromod\"")
-        .nth(1)
-        .and_then(|rest| {
-            rest.lines().find_map(|line| {
-                line.strip_prefix("source = \"")?
-                    .rsplit_once('#')?
-                    .1
-                    .strip_suffix('"')
-            })
+    let name_line = format!("name = \"{package}\"");
+    let prefix = format!("{field} = \"");
+    LOCK.split("[[package]]")
+        .find(|entry| entry.lines().any(|line| line == name_line))
+        .and_then(|entry| {
+            entry
+                .lines()
+                .find_map(|line| line.strip_prefix(&prefix)?.strip_suffix('"'))
         })
-        .expect("neuromod git source pin in Cargo.lock")
+        .unwrap_or_else(|| panic!("missing {package}.{field} in Cargo.lock"))
 }
 
 fn first_diverging_field(left: &TickTrace, right: &TickTrace) -> Option<&'static str> {
@@ -319,11 +320,29 @@ fn experiment_manifest_round_trips_seed_and_dependency_versions() {
     assert_eq!(restored.seed, SEED_A);
     assert_eq!(restored.plasticity_lab_version, env!("CARGO_PKG_VERSION"));
     assert_eq!(
-        restored.neuromod.git,
-        "https://github.com/Limen-Neural/neuromod"
+        restored.neuromod.source,
+        "registry+https://github.com/rust-lang/crates.io-index"
     );
-    assert_eq!(restored.neuromod.rev, cargo_lock_neuromod_rev());
-    assert_eq!(restored.neuromod.rand_version, "0.10");
+    assert_eq!(
+        restored.neuromod.version,
+        cargo_lock_field("neuromod", "version")
+    );
+    assert_eq!(
+        restored.neuromod.checksum,
+        cargo_lock_field("neuromod", "checksum")
+    );
+    assert_eq!(restored.neuromod.checksum.len(), 64);
+    assert!(
+        restored
+            .neuromod
+            .checksum
+            .bytes()
+            .all(|b| b.is_ascii_hexdigit())
+    );
+    assert_eq!(
+        restored.neuromod.rand_version,
+        cargo_lock_field("rand", "version")
+    );
     assert!(json.contains("\"seed\""));
     assert!(json.contains("plasticity_lab_version"));
 }

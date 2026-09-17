@@ -19,7 +19,6 @@ ignore = []
 
 [licenses]
 # Dual-licensed project; allow common permissive licenses used by Rust ecosystem.
-# First-party GPL git deps are scoped via exceptions below (not global allow).
 confidence-threshold = 0.8
 allow = [
     "MIT",
@@ -35,28 +34,12 @@ allow = [
     "Unlicense",
 ]
 
-# Scope copyleft to first-party Limen-Neural crates only
-[[licenses.exceptions]]
-crate = "neuromod"
-allow = ["GPL-3.0", "GPL-3.0-or-later"]
-
-[[licenses.exceptions]]
-crate = "limbic-critic"
-allow = ["GPL-3.0", "GPL-3.0-or-later"]
-
 [bans]
 multiple-versions = "warn"
-# Must remain "allow": git+branch deps (neuromod, limbic-critic) are treated
-# as wildcards by cargo-deny. Concrete crates.io ranges already avoid `*`.
-# Revisit once these sibling crates are published and pinned to registry
-# version ranges (see #67 — deferred: siblings aren't on crates.io yet).
-wildcards = "allow"
+wildcards = "deny"
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = [
-    "https://github.com/Limen-Neural/neuromod",
-    "https://github.com/Limen-Neural/limbic-critic",
-]
+allow-git = []

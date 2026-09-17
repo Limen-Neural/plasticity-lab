@@ -20,7 +20,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `rust-toolchain.toml` pins the toolchain for local dev, and — less obviously — for the `validate` job too: every step in that job invokes bare `cargo`/`rustc`, and rustup's directory-override resolution means a committed `rust-toolchain.toml` wins over whatever the `dtolnay/rust-toolchain` action set as the rustup default (verified against that action's source: it only runs `rustup default <toolchain>`, never a `+<version>`/PATH override that would beat a directory file). That action's `toolchain:` input mainly guarantees the version is installed and matches `rust-toolchain.toml`'s current value — keep them in sync as a matter of hygiene, but `rust-toolchain.toml` is what's actually driving `validate`'s `fmt`/`clippy`/`build`/`test`/`doc` steps. The `msrv` job is genuinely different: its build/test steps use explicit `cargo +<version> ...` (not bare `cargo`), and an explicit `+toolchain` override wins over any directory file — that job really is decoupled from `rust-toolchain.toml`, by design (see its own comment in the workflow). Two separate rules, don't conflate them: raising the actual MSRV means bumping `Cargo.toml`'s `rust-version` and *every* version literal in the `msrv` job together — that's three spots, not two: the `Install MSRV toolchain` step's `toolchain:` input (which controls what actually gets installed) as well as both `cargo +<version>` invocations (which select among installed toolchains but can't install one — `+toolchain` requires it to already be present). Bumping only the `cargo +<version>` lines without the install step leaves the new version uninstalled and the job broken. Advancing the day-to-day toolchain means bumping `rust-toolchain.toml`'s `channel` and the `validate` job's `dtolnay/rust-toolchain` input together — but that's not the complete list either: `.devcontainer/Dockerfile`'s `FROM rust:<version>-slim-bookworm`, `.devcontainer/devcontainer.json`'s `name` field, `.cursor/Dockerfile`'s `FROM rust:<version>-slim-bookworm` (the Cursor cloud-agent environment), and `.devin/blueprint.yaml`'s three `rustup ... <version>` lines all hardcode the same version independently and don't derive from `rust-toolchain.toml` or anything else, so they go stale silently if skipped (`.devcontainer/devcontainer.json`'s `name` was missed exactly this way during a past bump — check its current value against `rust-toolchain.toml` rather than trusting it). `README.md` and `AGENTS.md` also state the version in prose. None of this requires touching the `msrv` job. (Deliberately not naming a specific version number anywhere in this paragraph — check `Cargo.toml`'s `rust-version` for the actual current value, since any literal written here will go stale on the next bump, as happened to an earlier draft of this very paragraph.)
 
-The `critic` feature (off by default, renamed from `integration` in #67 — `axon-encoder` was dropped entirely since no code in this crate ever consumed it) pulls `limbic-critic` as a git dependency tracking `Limen-Neural/limbic-critic` `main`. Feature-gated code (`src/bridge.rs`, `PlasticityTrainer::train_step_from_critic`) only compiles/tests with `--all-features` or `--features critic` — plain `cargo test` will silently skip it.
+The `critic` feature (off by default, renamed from `integration` in #67 — `axon-encoder` was dropped entirely since no code in this crate ever consumed it) pulls the optional registry dependency `limbic-critic = "0.3.0"`. Feature-gated code (`src/bridge.rs`, `PlasticityTrainer::train_step_from_critic`) only compiles/tests with `--all-features` or `--features critic` — plain `cargo test` will silently skip it.
 
 ## Architecture
 
@@ -60,7 +60,9 @@ One behavioral detail that isn't obvious from the public API alone:
 - This crate never encodes inputs or shapes rewards itself. `train_step`/`run_session` take precomputed `stimuli: &[f32]` and a scalar `reward: f32`; `train_step_with_modulators` and, under `critic`, `train_step_from_critic`/`apply_modulator_vector` take `stimuli: &[f32]` plus explicit `NeuroModulators`/`ModulatorVector` instead of a scalar reward. Encoding is `axon-encoder`'s job (not a dependency here — wire it in yourself), reward shaping is `limbic-critic`'s.
 - No domain-specific training logic (e.g. mining, trading) and no distillation/teacher-student transfer — that belongs to `SynapticDistill.jl` (Julia sister project, not a binding of this crate).
 - No `unsafe` code (enforced by Codacy static analysis).
-- Git dependencies are pinned by `branch = "main"`, not `rev` — don't change that without discussion (see `REVIEW.md`), and treat `deny.toml`'s `allow-git` list as the source of truth for which git hosts are permitted.
+- Release dependencies are registry-qualified (`neuromod = "0.6.0"`; optional
+  `limbic-critic = "0.3.0"`). Do not substitute mutable git, path, or
+  placeholder-version sources when qualifying a release.
 
 ## Conventions
 
@@ -70,4 +72,13 @@ One behavioral detail that isn't obvious from the public API alone:
 
 ## v0.2 release context
 
-The crate is working toward a v0.2 crates.io release (epic issue #43). The trainer rename (`SpikenautTrainer` → `PlasticityTrainer`, #65) and the `TrainingConfig` field cleanup (#66) have already landed — `PlasticityTrainer` and the single-field `TrainingConfig` above are the current state, not a future one. `SpikenautTrainer` survives only as a `#[deprecated]`, `#[doc(hidden)]` migration alias at both `plasticity_lab::SpikenautTrainer` and `plasticity_lab::trainer::SpikenautTrainer` — don't use it in new code, and don't assume its presence in `src/` means the rename is still pending.
+`0.2.0` is an unpublished crates.io release candidate (epic issue #43). The
+trainer rename (`SpikenautTrainer` → `PlasticityTrainer`, #65) and the
+`TrainingConfig` field cleanup (#66) have already landed — `PlasticityTrainer`
+and the single-field `TrainingConfig` above are the current state, not a future
+one. `SpikenautTrainer` survives only as a `#[deprecated]`, `#[doc(hidden)]`
+migration alias at both `plasticity_lab::SpikenautTrainer` and
+`plasticity_lab::trainer::SpikenautTrainer`; do not use it in new code or
+assume its presence means the rename is pending. Before publication, run the
+locked tests, all-feature package and dry-run, extracted archive tests, and an
+independent extracted-package consumer smoke test documented in `RELEASE.md`.

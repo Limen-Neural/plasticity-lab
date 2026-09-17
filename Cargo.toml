@@ -1,6 +1,6 @@
 [package]
 name = "plasticity-lab"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 description = "Reward-modulated SNN training/session orchestration loop above neuromod's plasticity primitives"
 license = "MIT OR Apache-2.0"
@@ -9,24 +9,20 @@ repository = "https://github.com/Limen-Neural/plasticity-lab"
 readme = "README.md"
 keywords = ["snn", "stdp", "plasticity", "neuromodulation", "reward-modulation"]
 categories = ["science", "simulation"]
-# Bounded below by the neuromod git dependency, which currently requires 1.97.1.
+# Matches the minimum supported Rust version of neuromod 0.6.0.
 rust-version = "1.98.1"
-# Repo-governance/CI/dev-environment files that a crates.io consumer never
-# needs and that don't belong in the published package artifact (#68).
-exclude = [
-    ".codacy.yml",
-    ".deepsource.toml",
-    ".devcontainer/",
-    ".devin/",
-    ".github/",
-    ".gitignore",
-    "codecov.yml",
-    "rust-toolchain.toml",
-    "deny.toml",
-    "AGENTS.md",
-    "CLAUDE.md",
-    "REVIEW.md",
-    "RELEASE.md",
+# Only consumer-facing source, examples, and licensing belong in the archive.
+include = [
+    "/src/**",
+    "/examples/**",
+    "/Cargo.toml",
+    "/Cargo.lock",
+    "/README.md",
+    "/CHANGELOG.md",
+    "/LICENSE-MIT",
+    "/LICENSE-APACHE-2.0",
+    "/LICENSES/**",
+    "/REUSE.toml",
 ]
 
 # docs.rs does not enable optional features by default; without this, the
@@ -43,11 +39,9 @@ thiserror = "2.0"
 # Same major as neuromod's `rand` so the traits line up.
 rand = "0.10"
 
-# Git dependencies (track main until crates are published on crates.io).
-# neuromod main uses norepinephrine (not cortisol); limbic-critic main emits
-# ModulatorVector without a neuromod dependency — see src/bridge.rs.
-neuromod = { git = "https://github.com/Limen-Neural/neuromod", branch = "main" }
-limbic-critic = { git = "https://github.com/Limen-Neural/limbic-critic", branch = "main", optional = true }
+# Registry releases provide the seeded-step API and browser entropy feature.
+neuromod = "0.6.0"
+limbic-critic = { version = "0.3.0", optional = true }
 
 [dev-dependencies]
 serde_json = "1.0"

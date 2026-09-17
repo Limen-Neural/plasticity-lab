@@ -15,7 +15,7 @@
 //!
 //! # Features
 //!
-//! - **default** — core loop only (`neuromod` + serde/thiserror).
+//! - **default** — core loop only (`neuromod` + serde/thiserror/rand).
 //! - **`critic`** — optional dep on `limbic-critic`, plus the `bridge`
 //!   adapter that converts critic `limbic_critic::ModulatorVector` into
 //!   [`neuromod::NeuroModulators`].
@@ -76,10 +76,9 @@ pub use bridge::{apply_modulator_vector, from_neuromodulators, to_neuromodulator
 
 /// Deprecated alias for [`PlasticityTrainer`].
 ///
-/// This crate is pre-1.0 and consumed via git dependency, so this alias exists only
-/// as a short-lived migration aid for existing consumers. It is **not** part of the
-/// documented public API: new code must use [`PlasticityTrainer`] directly, and this
-/// alias will be removed in a future release.
+/// This crate is pre-1.0. The alias is a short-lived migration aid for existing
+/// consumers and is **not** part of the documented public API: new code must use
+/// [`PlasticityTrainer`] directly. It will be removed in a future release.
 #[deprecated(
     note = "renamed to `PlasticityTrainer`; this alias will be removed in a future release"
 )]

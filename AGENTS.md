@@ -42,7 +42,7 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 ## Cursor Cloud specific instructions
 
 - The Cursor cloud-agent environment is defined in `.cursor/environment.json` + `.cursor/Dockerfile` (base image `rust:1.98.1-slim-bookworm`, running as the `ubuntu` user). Both files are force-tracked via a `.gitignore` carve-out; the rest of `.cursor/` stays ignored.
-- The Build's `install` step runs `cargo fetch --locked && cargo build --locked --all-features && cargo test --no-run --locked --all-features`, so git dependencies plus the all-features build and test-harness caches are warm before an agent starts.
+- The Build's `install` step runs `cargo fetch --locked && cargo build --locked --all-features && cargo test --no-run --locked --all-features`, so registry dependencies plus the all-features build and test-harness caches are warm before an agent starts.
 - `.cursor/Dockerfile`'s `FROM rust:<version>` hardcodes the toolchain version independently of `rust-toolchain.toml` — bump it alongside the other version-pinned files on any toolchain change (see CLAUDE.md's toolchain-bump checklist).
 - This is a library crate with no binary/server to launch, so there is no `start` command; verify the environment by running the CI checks (`cargo build`/`test`/`clippy`/`fmt`) rather than starting an app.
 
@@ -87,6 +87,11 @@ Single Rust crate; part of the Limen-Neural ecosystem.
   variants above on Linux, macOS, and Windows (`fail-fast: false`).
   `cargo fmt --check`, `cargo deny`, rustdoc, and tarpaulin/Codecov stay
   Linux-only (musl cargo-deny binary and tarpaulin ptrace).
+- Release qualification also runs locked default/all-feature tests, lists the
+  package contents, runs all-feature `cargo package` and `cargo publish
+  --dry-run`, tests an extracted package, and builds an independent consumer
+  against that package with registry siblings. See `RELEASE.md` for the exact
+  commands and clean-checkout rules.
 
 ## Git conventions
 
@@ -103,5 +108,7 @@ Single Rust crate; part of the Limen-Neural ecosystem.
   is now a production dependency because `train_step_with_rng` /
   `run_session_with_rng` take `&mut impl rand::Rng`. Do not re-add
   `axon-encoder` or `tracing` solely to make Cargo resolve a sibling crate.
-- Git deps track `branch = "main"` in `Cargo.toml` (not a `rev` pin); `Cargo.lock` records the currently-resolved commit until `cargo update` bumps it. This intentionally stays a git dependency until `neuromod`/`limbic-critic` are published on crates.io — do not replace it with another mutable git ref as a way to appear crates.io-ready
+- Release dependencies use published registry requirements: `neuromod =
+  "0.6.0"` and optional `limbic-critic = "0.3.0"`. Do not replace them with
+  mutable git, path, or placeholder-version sources for a release candidate.
 - Do not add domain-specific or framework-heavy dependencies

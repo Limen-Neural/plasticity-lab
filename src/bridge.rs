@@ -14,7 +14,7 @@ use neuromod::{NeuroModulators, SpikingNetwork, StepError};
 
 /// Convert a critic [`ModulatorVector`] into neuromod [`NeuroModulators`].
 ///
-/// Field mapping is 1:1 on current main of both crates:
+/// Field mapping is 1:1 for the supported registry releases:
 /// `dopamine`, `serotonin`, `acetylcholine`, `norepinephrine`.
 #[inline]
 pub fn to_neuromodulators(v: &ModulatorVector) -> NeuroModulators {
@@ -139,7 +139,7 @@ mod tests {
             volatility: 0.0,
             surprise: 0.0,
         };
-        let mut critic = TDCritic::new(0.1);
+        let mut critic = TDCritic::new(0.1).expect("finite alpha in (0, 1]");
         let vector = critic.assess(&env);
         let mods = to_neuromodulators(&vector);
 

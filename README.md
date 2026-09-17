@@ -57,7 +57,7 @@ See also the ownership boundary with [SynapticDistill.jl](#boundary-with-synapti
 ### Prerequisites
 
 - Rust 1.98.1 toolchain ([rustup](https://rustup.rs/)) — pinned in `rust-toolchain.toml`
-- A `Cargo.toml` that can pull git dependencies from GitHub
+- Access to crates.io
 - Optional: a VS Code Dev Container setup is included under `.devcontainer/`
 
 CI-tested platforms: Linux, macOS, and Windows (`ubuntu-latest`, `macos-latest`, `windows-latest` in `.github/workflows/ci.yml`). Formatting, `cargo deny`, rustdoc, and coverage (tarpaulin → Codecov) stay Linux-only.
@@ -66,11 +66,12 @@ CI-tested platforms: Linux, macOS, and Windows (`ubuntu-latest`, `macos-latest`,
 
 ```toml
 [dependencies]
-plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab" }
-neuromod = { git = "https://github.com/Limen-Neural/neuromod" }
+plasticity-lab = "0.2.0"
+neuromod = "0.6.0"
 ```
 
-Pin `rev` values to match this crate’s `Cargo.toml` if you need a locked ecosystem build.
+Version `0.2.0` is the next unpublished release candidate; use this snippet
+after it is published. Until then, build this checkout directly.
 
 ### 2. Minimal reward-modulated session
 
@@ -123,13 +124,14 @@ To pull in `limbic-critic` as an optional dep and enable the critic → neuromod
 
 ```toml
 # Core only (recommended first step)
-plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab" }
+plasticity-lab = "0.2.0"
 
 # With the critic bridge
-plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", features = ["critic"] }
+plasticity-lab = { version = "0.2.0", features = ["critic"] }
+limbic-critic = "0.3.0"
 
 # In a browser or Web Worker (combine with `critic` when needed)
-plasticity-lab = { git = "https://github.com/Limen-Neural/plasticity-lab", features = ["wasm-js"] }
+plasticity-lab = { version = "0.2.0", features = ["wasm-js"] }
 ```
 
 **When to use default:** you already shape rewards and encode inputs yourself (or use plain `f32` stimuli and scalar rewards, as in the getting-started example). This includes any input-encoding needs — `axon-encoder` is a standalone sibling crate you wire in yourself; this crate never depends on it (see [Architecture brief](#architecture-brief)).

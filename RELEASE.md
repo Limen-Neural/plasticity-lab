@@ -1,6 +1,6 @@
 # Release process
 
-`0.2.0` is an unpublished release candidate. Run this checklist from a clean
+`0.2.0` was published on 2026-09-17. Run this checklist from a clean
 checkout of the exact commit intended for release. Do not tag it or describe
 it as published until `cargo publish` succeeds. The pre-publish final commit
 may carry a planned publication date; it becomes the release date only after a

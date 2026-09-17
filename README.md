@@ -70,7 +70,7 @@ plasticity-lab = "0.2.0"
 neuromod = "0.6.0"
 ```
 
-Version `0.2.0` is the next unpublished release candidate; use this snippet
+Version `0.2.0` was published on 2026-09-17; use this snippet
 after it is published. Until then, build this checkout directly.
 
 ### 2. Minimal reward-modulated session
@@ -404,7 +404,7 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 ## Cross-language notes
 
 | Language | Status | Notes |
-|----------|--------|--------|
+|----------|--------|-------|
 | **Rust** | Supported | This crate; use [Getting started](#getting-started) |
 | **Julia** | Sister project | Distillation only in [SynapticDistill.jl](https://github.com/Limen-Neural/SynapticDistill.jl) — not a binding of this crate |
 | **Python** | Not planned | No PyO3/maturin bindings exist; tracking issue [#13](https://github.com/Limen-Neural/plasticity-lab/issues/13) was closed as a duplicate without being implemented |

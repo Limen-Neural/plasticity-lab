@@ -4,7 +4,7 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
-## [0.2.0] - Unpublished release candidate
+## [0.2.0] - 2026-09-17
 
 The release date will be assigned when `0.2.0` is published to crates.io.
 

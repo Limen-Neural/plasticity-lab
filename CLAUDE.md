@@ -72,11 +72,11 @@ One behavioral detail that isn't obvious from the public API alone:
 
 ## v0.2 release context
 
-`0.2.0` is an unpublished crates.io release candidate (epic issue #43). The
+`0.2.0` was published on crates.io on 2026-09-17 (epic issue #43). The
 trainer rename (`SpikenautTrainer` → `PlasticityTrainer`, #65) and the
 `TrainingConfig` field cleanup (#66) have already landed — `PlasticityTrainer`
 and the single-field `TrainingConfig` above are the current state, not a future
-one. `SpikenautTrainer` survives only as a `#[deprecated]`, `#[doc(hidden)]`
+one. `SpikenautTrainer` survives only as a `#[deprecated]`, `#[doc(hidden)`]
 migration alias at both `plasticity_lab::SpikenautTrainer` and
 `plasticity_lab::trainer::SpikenautTrainer`; do not use it in new code or
 assume its presence means the rename is pending. Before publication, run the

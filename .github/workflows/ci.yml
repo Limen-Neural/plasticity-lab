@@ -42,7 +42,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Clippy (lint)
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --locked --all-targets --all-features -- -D warnings
 
       # cargo-deny is installed from the musl Linux binary; keep the license/
       # advisory gate on Linux only (same reason tarpaulin stays Linux-only).
@@ -73,22 +73,40 @@ jobs:
         run: cargo deny --locked check
 
       - name: Build
-        run: cargo build --all-features
+        run: cargo build --locked --all-features
 
       # Native CI covers the default and combined all-feature configurations.
       # The dedicated Browser WASM job separately checks `wasm-js`,
       # `critic,wasm-js`, and the enabled/disabled entropy feature tree.
       - name: Test (default features)
-        run: cargo test
+        run: cargo test --locked
 
       - name: Test (all features)
-        run: cargo test --all-features
+        run: cargo test --locked --all-features
 
       - name: Docs
         if: runner.os == 'Linux'
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --locked --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings
+
+      - name: Verify publishable package
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/package-target
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo package --locked --list --all-features
+          cargo package --locked --all-features
+          cargo publish --dry-run --locked --all-features
+          # Test the archive Cargo actually prepared, outside the checkout.
+          package_dir="$(mktemp -d)"
+          trap 'rm -rf "$package_dir"' EXIT
+          tar -xzf "$CARGO_TARGET_DIR"/package/plasticity-lab-*.crate -C "$package_dir"
+          manifest="$(find "$package_dir" -mindepth 2 -maxdepth 2 -name Cargo.toml)"
+          cargo test --locked --manifest-path "$manifest"
+          cargo test --locked --all-features --manifest-path "$manifest"
 
       # cargo-tarpaulin relies on Linux ptrace; Codecov is already wired here —
       # do not duplicate the upload on macOS/Windows.

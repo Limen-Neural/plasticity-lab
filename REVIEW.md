@@ -9,6 +9,10 @@ PR review standards for `plasticity-lab`. Applied by both automated bots and hum
 - [ ] `cargo fmt --check` — no formatting issues
 - [ ] `cargo clippy --all-targets --all-features -- -D warnings` — no warnings
 - [ ] `cargo test --all-features` — all tests green
+- [ ] Locked `cargo test` and `cargo test --all-features` pass for a release candidate
+- [ ] `cargo package --list --all-features` contains only intended release files
+- [ ] All-feature `cargo package` and `cargo publish --dry-run` pass
+- [ ] The extracted package tests and an independent extracted-package consumer smoke test pass
 - [ ] Locked `wasm32-unknown-unknown` checks pass with `wasm-js`, both with and without `critic`
 - [ ] The feature tree contains `getrandom/wasm_js` only when `wasm-js` is enabled
 - [ ] No new `unsafe` blocks
@@ -20,7 +24,7 @@ PR review standards for `plasticity-lab`. Applied by both automated bots and hum
 - [ ] Coverage doesn't decrease (Codecov status check)
 - [ ] New public items have rustdoc
 - [ ] Changes to `trainer.rs` include test coverage
-- [ ] No pinned git rev changes without discussion
+- [ ] Registry dependency requirements remain qualified to the versions tested
 
 ### Nice to have (note, don't request changes)
 

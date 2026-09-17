@@ -16,9 +16,9 @@ checksum = "9330f8b2ff13f34540b44e946ef35111825727b38d33286ef986142615121801"
 
 [[package]]
 name = "chacha20"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d524456ba66e72eb8b115ff89e01e497f8e6d11d78b70b1aa13c0fbd97540a81"
+checksum = "65c35e4b699c7e15ccbe7ee35c005e4fc0a278d22238a2857e6ce2dadeda1b06"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -72,8 +72,9 @@ checksum = "a7743783ea728ef5c31194c6590797eed286449b4a4e87d626d8a51f0a94e732"
 
 [[package]]
 name = "limbic-critic"
-version = "0.2.0"
-source = "git+https://github.com/Limen-Neural/limbic-critic?branch=main#aa09665f03bc08a17767166a372f98f90e3f9e9b"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0afb84406e35b755770254f4418c4b7b92b79c089f10e5c671b9ae2016a79329"
 
 [[package]]
 name = "memchr"
@@ -84,7 +85,8 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "neuromod"
 version = "0.6.0"
-source = "git+https://github.com/Limen-Neural/neuromod?branch=main#3fe526116683d7392e309760c017afe8a934619c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e0a02908726636a6c0ce971df297923914a67766d497c5436facf743c68c329"
 dependencies = [
  "getrandom",
  "rand",
@@ -99,7 +101,7 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 
 [[package]]
 name = "plasticity-lab"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "limbic-critic",
  "neuromod",

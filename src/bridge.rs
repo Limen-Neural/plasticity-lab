@@ -132,6 +132,7 @@ mod tests {
     }
 
     #[test]
+    /// Verifies that a time-difference critic's output maps to neuromodulators.
     fn td_critic_assess_maps_into_neuromodulators() {
         let env = ConstEnv {
             objective: 0.5,

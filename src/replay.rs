@@ -70,6 +70,7 @@ struct SessionOutcome {
     ticks: Vec<TickTrace>,
 }
 
+/// Builds replay provenance from the current crate metadata and locked dependencies.
 fn example_manifest(seed: u64, spec: NetworkSpec, training: TrainingConfig) -> ExperimentManifest {
     ExperimentManifest {
         seed,
@@ -158,8 +159,10 @@ fn capture_tick(tick: usize, spikes: &[usize], network: &SpikingNetwork) -> Tick
     }
 }
 
-// Cargo writes string fields one per line. Keep lookups within one package so
-// a missing checksum cannot accidentally come from the following dependency.
+/// Reads a string field from one package entry in the checked-in Cargo lockfile.
+///
+/// Cargo writes string fields one per line. Restricting the lookup to one package
+/// prevents a missing checksum from being read from a following dependency.
 fn cargo_lock_field(package: &str, field: &str) -> &'static str {
     const LOCK: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.lock"));
     let name_line = format!("name = \"{package}\"");
@@ -307,6 +310,7 @@ fn assert_replay_matches(spec: NetworkSpec, config: TrainingConfig, seed: u64) {
 }
 
 #[test]
+/// Verifies that replay provenance preserves registry dependency identities.
 fn experiment_manifest_round_trips_seed_and_dependency_versions() {
     let spec = NetworkSpec {
         num_lif: 4,

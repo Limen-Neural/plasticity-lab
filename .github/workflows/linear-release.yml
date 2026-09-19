@@ -21,6 +21,11 @@ on:
       tag:
         description: "Git tag of the release to sync (e.g. v0.2.0)"
         required: true
+      dry_run:
+        description: "Resolve and verify the target release without completing it"
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -39,6 +44,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           DISPATCH_TAG: ${{ github.event.inputs.tag }}
+          DISPATCH_DRY_RUN: ${{ github.event.inputs.dry_run }}
           RELEASE_EVENT_TAG: ${{ github.event.release.tag_name }}
         run: |
           set -euo pipefail
@@ -58,6 +64,11 @@ jobs:
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ "$DISPATCH_DRY_RUN" = "true" ]; then
+            echo "dry_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dry_run=false" >> "$GITHUB_OUTPUT"
+          fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -65,9 +76,66 @@ jobs:
           fetch-depth: 0 # linear-release-action wants commit history available
           persist-credentials: false
 
-      - name: Complete the matching Linear release
+      # Resolve read-only first. Completion is only permitted after these
+      # outputs prove the action selected this repository's release pipeline.
+      - name: Resolve the matching Linear release
+        id: target_release
         uses: linear/linear-release-action@53ad0f863963e7f8e270fba18426bbb55ef55384 # v0.17.2
         with:
           access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
           command: complete
+          name: plasticity-lab
           version: ${{ steps.tag.outputs.version }}
+          dry_run: true
+
+      - name: Verify resolved Linear release
+        env:
+          EXPECTED_NAME: plasticity-lab
+          EXPECTED_VERSION: ${{ steps.tag.outputs.version }}
+          EXPECTED_URL_PREFIX: https://linear.app/rpd-34/pipeline/plasticity-lab/release/
+          RELEASE_NAME: ${{ steps.target_release.outputs.release-name }}
+          RELEASE_VERSION: ${{ steps.target_release.outputs.release-version }}
+          RELEASE_URL: ${{ steps.target_release.outputs.release-url }}
+        run: |
+          set -euo pipefail
+          test "$RELEASE_NAME" = "$EXPECTED_NAME"
+          test "$RELEASE_VERSION" = "$EXPECTED_VERSION"
+          case "$RELEASE_URL" in
+            "$EXPECTED_URL_PREFIX"*) ;;
+            *)
+              echo "::error::Linear action resolved an unexpected release URL: $RELEASE_URL" >&2
+              exit 1
+              ;;
+          esac
+
+      - name: Complete the verified Linear release
+        id: complete_release
+        if: steps.tag.outputs.dry_run != 'true'
+        uses: linear/linear-release-action@53ad0f863963e7f8e270fba18426bbb55ef55384 # v0.17.2
+        with:
+          access_key: ${{ secrets.LINEAR_ACCESS_KEY }}
+          command: complete
+          name: plasticity-lab
+          version: ${{ steps.tag.outputs.version }}
+          dry_run: false
+
+      - name: Verify completed Linear release
+        if: steps.tag.outputs.dry_run != 'true'
+        env:
+          EXPECTED_NAME: plasticity-lab
+          EXPECTED_VERSION: ${{ steps.tag.outputs.version }}
+          EXPECTED_URL_PREFIX: https://linear.app/rpd-34/pipeline/plasticity-lab/release/
+          RELEASE_NAME: ${{ steps.complete_release.outputs.release-name }}
+          RELEASE_VERSION: ${{ steps.complete_release.outputs.release-version }}
+          RELEASE_URL: ${{ steps.complete_release.outputs.release-url }}
+        run: |
+          set -euo pipefail
+          test "$RELEASE_NAME" = "$EXPECTED_NAME"
+          test "$RELEASE_VERSION" = "$EXPECTED_VERSION"
+          case "$RELEASE_URL" in
+            "$EXPECTED_URL_PREFIX"*) ;;
+            *)
+              echo "::error::Linear action completed an unexpected release URL: $RELEASE_URL" >&2
+              exit 1
+              ;;
+          esac

@@ -303,7 +303,7 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 ### `train_step`
 
 1. Reads current neuromodulators from the network.
-2. If `use_reward_modulation` is `true` (default), adjusts dopamine / norepinephrine from the scalar `reward` (clamped to `[0, 1]`); otherwise leaves modulators unchanged.
+2. If `use_reward_modulation` is `true` (default), adjusts dopamine / norepinephrine from a finite scalar `reward` (clamped to `[0, 1]`); non-finite rewards (`NaN` and ±infinity) skip modulation. Otherwise leaves modulators unchanged.
 3. Calls `network.step(stimuli, &modulators)`.
 4. Returns spike indices (`Vec<usize>`) or `StepError`.
 
@@ -313,7 +313,7 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 2. Preflights every example (stimulus length vs `num_channels`, finite stimuli, infinite reward) and returns `TrainerError::InvalidSample { index, reason }` on the first failure — still with no mutation.
 3. Snapshots thresholds and weights.
 4. Calls `train_step` for each `TrainingExample` in slice order.
-5. Aggregates spikes and average reward (NaN rewards are omitted from the mean, matching `train_step`).
+5. Aggregates spikes and average reward (non-finite rewards are omitted from the mean, matching `train_step`; infinite rewards never reach this step because preflight rejects them).
 6. Records per-neuron threshold and weight drifts vs. session start.
 7. Returns `TrainingSummary`.
 

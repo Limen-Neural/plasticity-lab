@@ -125,10 +125,13 @@ impl PlasticityTrainer {
 
     /// Runs one training step with generic stimuli and an externally computed reward.
     ///
-    /// When [`TrainingConfig::use_reward_modulation`] is `true` (default), positive
-    /// `reward` increases dopamine and decreases norepinephrine; negative reward does
-    /// the opposite emphasis. Modulator values are clamped to `[0.0, 1.0]`. When the
-    /// flag is `false`, the network steps with its current modulators unchanged.
+    /// When [`TrainingConfig::use_reward_modulation`] is `true` (default) and `reward`
+    /// is finite, positive values increase dopamine and decrease norepinephrine;
+    /// negative values do the opposite emphasis. Modulator values are clamped to
+    /// `[0.0, 1.0]`. Non-finite rewards (`NaN` and ±infinity) leave modulators
+    /// unchanged so invalid environment data cannot poison plasticity updates.
+    /// When the flag is `false`, the network steps with its current modulators
+    /// unchanged regardless of `reward`.
     ///
     /// Returns indices of neurons that spiked, or a [`StepError`] from neuromod.
     pub fn train_step(

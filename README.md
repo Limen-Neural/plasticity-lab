@@ -231,10 +231,11 @@ fn main() -> Result<(), StepError> {
 
 ### Custom rewards (with or without limbic-critic)
 
-`plasticity-lab` never computes rewards. Pass any `f32`:
+`plasticity-lab` never computes rewards. Pass a scalar `f32` from your environment or critic:
 
-- Positive → dopamine up / norepinephrine down (clamped)
-- Negative → norepinephrine up / dopamine adjusted (clamped)
+- Finite positive → dopamine up / norepinephrine down (clamped)
+- Finite negative → norepinephrine up / dopamine adjusted (clamped)
+- `NaN` or ±infinity → no neuromodulator update in `train_step` (`NaN` is omitted from session `avg_reward`; ±infinity is rejected by `run_session` preflight)
 
 Shape rewards in application code or via [`limbic-critic`](https://github.com/Limen-Neural/limbic-critic) when using the `critic` feature.
 
@@ -329,7 +330,7 @@ Same as `run_session`, plus one `TrainingStepEvent` after each successful `train
 |-------|---------|
 | `steps_processed` | Number of examples run |
 | `total_spikes` | Sum of spike events across steps |
-| `avg_reward` | Mean of example rewards |
+| `avg_reward` | Mean of finite example rewards (`0.0` when none are finite) |
 | `threshold_drifts` | Per-neuron Δthreshold over the session |
 | `weight_drifts` | Per-neuron per-channel Δweight over the session |
 | `per_neuron_spikes` | Spike counts per neuron |

@@ -21,7 +21,7 @@ and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [0.2.0] - 2026-09-17
 
-The release date will be assigned when `0.2.0` is published to crates.io.
+Published to crates.io on 2026-09-17.
 
 ### Removed (breaking)
 

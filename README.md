@@ -96,7 +96,7 @@ fn main() {
     }
 
     let batch = vec![TrainingExample {
-        stimuli: vec![1.0; 8],
+        stimuli: vec![1.0, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02],
         reward: 1.0,
     }; 8];
 
@@ -105,7 +105,7 @@ fn main() {
         .run_session_with_rng(&mut network, &batch, &mut rng)
         .unwrap();
     assert!(summary.total_spikes > 0);
-    assert!(summary.weight_drifts.iter().flatten().any(|delta| *delta != 0.0));
+    assert!(summary.weight_drifts.iter().flatten().any(|delta| delta.abs() > 1e-5));
     println!(
         "processed={}, avg_reward={}, total_spikes={}",
         summary.steps_processed, summary.avg_reward, summary.total_spikes

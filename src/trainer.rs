@@ -833,7 +833,13 @@ mod tests {
     fn documented_nonzero_initialization_spikes_and_changes_weights() {
         let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = documented_learning_network();
-        let batch = vec![example(8, 1.0, 1.0); 8];
+        let batch = vec![
+            TrainingExample {
+                stimuli: vec![1.0, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02],
+                reward: 1.0,
+            };
+            8
+        ];
         let mut rng = StdRng::seed_from_u64(0x5EED);
 
         let summary = trainer
@@ -849,7 +855,7 @@ mod tests {
                 .weight_drifts
                 .iter()
                 .flatten()
-                .any(|delta| *delta != 0.0),
+                .any(|delta| delta.abs() > 1e-5),
             "the documented network must show a measurable weight change"
         );
         assert!(

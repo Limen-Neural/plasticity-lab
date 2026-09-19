@@ -38,7 +38,7 @@
 //!     neuron.weights.fill(2.0 / network.num_channels as f32);
 //! }
 //! let batch = vec![TrainingExample {
-//!     stimuli: vec![1.0; 8],
+//!     stimuli: vec![1.0, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02],
 //!     reward: 1.0,
 //! }; 8];
 //! let mut rng = StdRng::seed_from_u64(0x5EED);
@@ -46,7 +46,7 @@
 //!     .run_session_with_rng(&mut network, &batch, &mut rng)
 //!     .unwrap();
 //! assert!(summary.total_spikes > 0);
-//! assert!(summary.weight_drifts.iter().flatten().any(|delta| *delta != 0.0));
+//! assert!(summary.weight_drifts.iter().flatten().any(|delta| delta.abs() > 1e-5));
 //! ```
 //!
 //! # Limbic bridge (`critic`)

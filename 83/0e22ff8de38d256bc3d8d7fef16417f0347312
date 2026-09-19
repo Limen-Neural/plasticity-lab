@@ -1,25 +1,7 @@
-RELEASE.md
-  s_b1a8ac53eab429::t_1789f3c2d85cbc 3,22
-Cargo.toml
-  s_b1a8ac53eab429::t_1789f3c2d85cbc 3
-README.md
-  s_b1a8ac53eab429::t_1789f3c2d85cbc 75,80,144,147,151
-CHANGELOG.md
-  s_b1a8ac53eab429::t_1789f3c2d85cbc 8-10,24-32
 ---
 {
   "schema_version": "authorship/3.0.0",
   "git_ai_version": "1.5.2",
   "base_commit_sha": "830e22ff8de38d256bc3d8d7fef16417f0347312",
-  "prompts": {},
-  "sessions": {
-    "s_b1a8ac53eab429": {
-      "agent_id": {
-        "tool": "codex",
-        "id": "01a0b83c-e0a3-7a83-9109-e8784ba50bca",
-        "model": "gpt-5.6-luna"
-      },
-      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
-    }
-  }
+  "prompts": {}
 }

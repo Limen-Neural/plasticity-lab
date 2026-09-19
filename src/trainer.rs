@@ -618,9 +618,18 @@ mod tests {
     use super::*;
     use crate::config::TrainingConfig;
     use crate::observer::{TrainingObserver, TrainingStepEvent};
+    use rand::{SeedableRng, rngs::StdRng};
 
     fn small_network() -> SpikingNetwork {
         SpikingNetwork::with_dimensions(4, 2, 8)
+    }
+
+    fn documented_learning_network() -> SpikingNetwork {
+        let mut network = SpikingNetwork::with_dimensions(4, 2, 8);
+        for neuron in &mut network.neurons {
+            neuron.weights.fill(2.0 / network.num_channels as f32);
+        }
+        network
     }
 
     fn network_snapshot(network: &SpikingNetwork) -> String {
@@ -818,6 +827,38 @@ mod tests {
         assert_eq!(summary.steps_processed, 2);
         assert!((summary.avg_reward - 0.05).abs() < 1e-5);
         assert_eq!(summary.threshold_drifts.len(), network.neurons.len());
+    }
+
+    #[test]
+    fn documented_nonzero_initialization_spikes_and_changes_weights() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = documented_learning_network();
+        let batch = vec![example(8, 1.0, 1.0); 8];
+        let mut rng = StdRng::seed_from_u64(0x5EED);
+
+        let summary = trainer
+            .run_session_with_rng(&mut network, &batch, &mut rng)
+            .expect("documented learning session");
+
+        assert!(
+            summary.total_spikes > 0,
+            "the documented network must spike"
+        );
+        assert!(
+            summary
+                .weight_drifts
+                .iter()
+                .flatten()
+                .any(|delta| *delta != 0.0),
+            "the documented network must show a measurable weight change"
+        );
+        assert!(
+            network
+                .neurons
+                .iter()
+                .flat_map(|neuron| neuron.weights.iter())
+                .all(|weight| weight.is_finite())
+        );
     }
 
     // neuromod's `SpikingNetwork::step` only consults RNG to decide, per channel,

@@ -30,13 +30,19 @@
 //! use plasticity_lab::{PlasticityTrainer, TrainingConfig, TrainingExample};
 //!
 //! let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
-//! let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
+//! let mut network = SpikingNetwork::with_dimensions(4, 2, 8);
+//! for neuron in &mut network.neurons {
+//!     // `with_dimensions` intentionally creates blank weights. Seed the
+//!     // documented L1 budget equally across input channels before training.
+//!     neuron.weights.fill(2.0 / network.num_channels as f32);
+//! }
 //! let batch = vec![TrainingExample {
-//!     stimuli: vec![0.25; 64],
-//!     reward: 0.2,
-//! }];
+//!     stimuli: vec![1.0; 8],
+//!     reward: 1.0,
+//! }; 8];
 //! let summary = trainer.run_session(&mut network, &batch).unwrap();
-//! assert_eq!(summary.steps_processed, 1);
+//! assert!(summary.total_spikes > 0);
+//! assert!(summary.weight_drifts.iter().flatten().any(|delta| *delta != 0.0));
 //! ```
 //!
 //! # Limbic bridge (`critic`)

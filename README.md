@@ -74,39 +74,50 @@ CI-tested platforms: Linux, macOS, and Windows (`ubuntu-latest`, `macos-latest`,
 [dependencies]
 plasticity-lab = "0.2.0"
 neuromod = "0.6.0"
+rand = "0.10"
 ```
 
-Version `0.2.0` was published on 2026-09-17; use this snippet
-after it is published. Until then, build this checkout directly.
+Version `0.2.0` was published on 2026-09-17 and is available from crates.io.
 
 ### 2. Minimal reward-modulated session
 
 ```rust
 use neuromod::SpikingNetwork;
 use plasticity_lab::{PlasticityTrainer, TrainingConfig, TrainingExample};
+use rand::{rngs::StdRng, SeedableRng};
 
 fn main() {
     let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
-    let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
+    let mut network = SpikingNetwork::with_dimensions(4, 2, 8);
+    for neuron in &mut network.neurons {
+        // `with_dimensions` intentionally creates blank weights. Seed the
+        // documented L1 budget equally across input channels before training.
+        neuron.weights.fill(2.0 / network.num_channels as f32);
+    }
 
-    let batch = vec![
-        TrainingExample {
-            stimuli: vec![0.25; 64],
-            reward: 0.2,
-        },
-        TrainingExample {
-            stimuli: vec![0.4; 64],
-            reward: -0.1,
-        },
-    ];
+    let batch = vec![TrainingExample {
+        stimuli: vec![1.0, 0.8, 0.6, 0.4, 0.2, 0.1, 0.05, 0.02],
+        reward: 1.0,
+    }; 8];
 
-    let summary = trainer.run_session(&mut network, &batch).unwrap();
+    let mut rng = StdRng::seed_from_u64(0x5EED);
+    let summary = trainer
+        .run_session_with_rng(&mut network, &batch, &mut rng)
+        .unwrap();
+    assert!(summary.total_spikes > 0);
+    assert!(summary.weight_drifts.iter().flatten().any(|delta| delta.abs() > 1e-5));
     println!(
         "processed={}, avg_reward={}, total_spikes={}",
         summary.steps_processed, summary.avg_reward, summary.total_spikes
     );
 }
 ```
+
+`SpikingNetwork::with_dimensions` deliberately starts with all-zero weights.
+That blank topology can step, but it has no active weighted path and therefore
+cannot demonstrate learning. The equal-share initialization above distributes
+neuromod's current `2.0` L1 weight budget across the input channels; applications
+remain responsible for choosing their own topology and initialization policy.
 
 ### 3. What you get back
 

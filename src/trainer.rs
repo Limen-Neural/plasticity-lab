@@ -125,10 +125,13 @@ impl PlasticityTrainer {
 
     /// Runs one training step with generic stimuli and an externally computed reward.
     ///
-    /// When [`TrainingConfig::use_reward_modulation`] is `true` (default), positive
-    /// `reward` increases dopamine and decreases norepinephrine; negative reward does
-    /// the opposite emphasis. Modulator values are clamped to `[0.0, 1.0]`. When the
-    /// flag is `false`, the network steps with its current modulators unchanged.
+    /// When [`TrainingConfig::use_reward_modulation`] is `true` (default) and `reward`
+    /// is finite, positive values increase dopamine and decrease norepinephrine;
+    /// negative values do the opposite emphasis. Modulator values are clamped to
+    /// `[0.0, 1.0]`. Non-finite rewards (`NaN` and ±infinity) leave modulators
+    /// unchanged so invalid environment data cannot poison plasticity updates.
+    /// When the flag is `false`, the network steps with its current modulators
+    /// unchanged regardless of `reward`.
     ///
     /// Returns indices of neurons that spiked, or a [`StepError`] from neuromod.
     pub fn train_step(
@@ -322,10 +325,11 @@ impl PlasticityTrainer {
     fn modulators_for_reward(&self, network: &SpikingNetwork, reward: f32) -> NeuroModulators {
         let mut modulators: NeuroModulators = network.modulators;
 
-        // Skip modulation on NaN: f32::clamp returns NaN unchanged rather than
-        // panicking, so a NaN reward would otherwise propagate silently into
-        // modulators that poison subsequent STDP / homeostasis updates.
-        if self.config.use_reward_modulation && !reward.is_nan() {
+        // Skip modulation on non-finite rewards: f32::clamp returns NaN
+        // unchanged rather than panicking, and ±infinity slams the clamped
+        // result to the 0/1 bounds. Either would silently corrupt subsequent
+        // STDP / homeostasis updates.
+        if self.config.use_reward_modulation && reward.is_finite() {
             // Positive reward shifts toward dopamine; negative toward norepinephrine
             // (stress/arousal). neuromod replaced the former cortisol field with
             // norepinephrine (see neuromod::NeuroModulators).
@@ -350,7 +354,7 @@ impl PlasticityTrainer {
         example: &TrainingExample,
         spikes: &[usize],
     ) {
-        if !example.reward.is_nan() {
+        if example.reward.is_finite() {
             *total_reward += example.reward;
             *valid_reward_count += 1;
         }
@@ -491,7 +495,7 @@ fn accumulate_reward(
     total_reward: &mut f32,
     valid_reward_count: &mut usize,
 ) {
-    if !example.reward.is_nan() {
+    if example.reward.is_finite() {
         *total_reward += example.reward;
         *valid_reward_count += 1;
     }
@@ -708,6 +712,27 @@ mod tests {
             .expect("nan reward must not panic");
         assert!((network.modulators.dopamine - 0.4).abs() < 1e-5);
         assert!((network.modulators.norepinephrine - 0.4).abs() < 1e-5);
+    }
+
+    #[test]
+    fn train_step_skips_infinite_reward_modulation() {
+        let mut network = small_network();
+        network.modulators.dopamine = 0.4;
+        network.modulators.norepinephrine = 0.4;
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        trainer
+            .train_step(&mut network, &[0.2; 8], f32::INFINITY)
+            .expect("infinite reward must not panic");
+        assert!((network.modulators.dopamine - 0.4).abs() < 1e-5);
+        assert!((network.modulators.norepinephrine - 0.4).abs() < 1e-5);
+
+        trainer
+            .train_step(&mut network, &[0.2; 8], f32::NEG_INFINITY)
+            .expect("negative infinity must not panic");
+        assert!((network.modulators.dopamine - 0.4).abs() < 1e-5);
+        assert!((network.modulators.norepinephrine - 0.4).abs() < 1e-5);
+        assert!(network.modulators.dopamine.is_finite());
+        assert!(network.modulators.norepinephrine.is_finite());
     }
 
     #[test]
@@ -934,6 +959,20 @@ mod tests {
 
         assert_eq!(summary.steps_processed, 3);
         assert!((summary.avg_reward - 0.3).abs() < 1e-5);
+        assert!(summary.avg_reward.is_finite());
+        assert!(
+            summary
+                .threshold_drifts
+                .iter()
+                .all(|value| value.is_finite())
+        );
+        assert!(
+            summary
+                .weight_drifts
+                .iter()
+                .flatten()
+                .all(|value| value.is_finite())
+        );
     }
 
     #[test]

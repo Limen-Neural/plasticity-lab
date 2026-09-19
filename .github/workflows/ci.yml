@@ -75,11 +75,20 @@ jobs:
       - name: Build
         run: cargo build --locked --all-features
 
-      # Native CI covers the default and combined all-feature configurations.
-      # The dedicated Browser WASM job separately checks `wasm-js`,
-      # `critic,wasm-js`, and the enabled/disabled entropy feature tree.
+      # Native CI covers default, no-default, critic-only, and combined
+      # all-feature configurations. `--no-default-features` catches accidental
+      # use of optional sister crates in the core API; `--features critic`
+      # covers adapter drift without pulling in `wasm-js`. The dedicated
+      # Browser WASM job separately checks `wasm-js`, `critic,wasm-js`, and
+      # the enabled/disabled entropy feature tree.
       - name: Test (default features)
         run: cargo test --locked
+
+      - name: Test (no default features)
+        run: cargo test --locked --no-default-features
+
+      - name: Test (critic feature)
+        run: cargo test --locked --features critic
 
       - name: Test (all features)
         run: cargo test --locked --all-features

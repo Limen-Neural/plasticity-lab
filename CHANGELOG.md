@@ -2,7 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
+
+### Added
+
+- Explicit CI coverage for `--no-default-features` and `--features critic`,
+  plus `tests/feature_matrix.rs` so optional sister crates cannot silently
+  leak into the core API.
+
+### Fixed
+
+- `train_step` now skips neuromodulator updates for all non-finite rewards
+  (`NaN` and ±infinity), not only `NaN`. Session preflight still rejects
+  infinite rewards; `avg_reward` continues to omit non-finite values.
 
 ## [0.2.0] - 2026-09-17
 

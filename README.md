@@ -74,6 +74,7 @@ CI-tested platforms: Linux, macOS, and Windows (`ubuntu-latest`, `macos-latest`,
 [dependencies]
 plasticity-lab = "0.2.0"
 neuromod = "0.6.0"
+rand = "0.10"
 ```
 
 Version `0.2.0` was published on 2026-09-17 and is available from crates.io.
@@ -83,6 +84,7 @@ Version `0.2.0` was published on 2026-09-17 and is available from crates.io.
 ```rust
 use neuromod::SpikingNetwork;
 use plasticity_lab::{PlasticityTrainer, TrainingConfig, TrainingExample};
+use rand::{rngs::StdRng, SeedableRng};
 
 fn main() {
     let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
@@ -98,7 +100,10 @@ fn main() {
         reward: 1.0,
     }; 8];
 
-    let summary = trainer.run_session(&mut network, &batch).unwrap();
+    let mut rng = StdRng::seed_from_u64(0x5EED);
+    let summary = trainer
+        .run_session_with_rng(&mut network, &batch, &mut rng)
+        .unwrap();
     assert!(summary.total_spikes > 0);
     assert!(summary.weight_drifts.iter().flatten().any(|delta| *delta != 0.0));
     println!(

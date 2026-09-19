@@ -1,6 +1,6 @@
 # Release process
 
-`0.2.0` was published on 2026-09-17. Run this checklist from a clean
+`0.2.1` is the current release candidate. Run this checklist from a clean
 checkout of the exact commit intended for release. Do not tag it or describe
 it as published until `cargo publish` succeeds. The pre-publish final commit
 may carry a planned publication date; it becomes the release date only after a
@@ -19,7 +19,7 @@ test -z "$(git status --porcelain)"
 The release candidate must use the published registry dependencies:
 
 ```toml
-plasticity-lab = "0.2.0"
+plasticity-lab = "0.2.1"
 neuromod = "0.6.0"
 limbic-critic = "0.3.0" # optional, enabled by the `critic` feature
 ```

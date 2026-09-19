@@ -4,8 +4,8 @@
 [![codecov](https://codecov.io/gh/Limen-Neural/plasticity-lab/branch/main/graph/badge.svg)](https://codecov.io/gh/Limen-Neural/plasticity-lab)
 [![crates.io](https://img.shields.io/crates/v/plasticity-lab.svg)](https://crates.io/crates/plasticity-lab)
 [![docs.rs](https://docs.rs/plasticity-lab/badge.svg)](https://docs.rs/plasticity-lab)
-[![Codacy](https://img.shields.io/badge/code%20quality-Codacy-222f29?logo=codacy)](https://app.codacy.com/gh/Limen-Neural/plasticity-lab/dashboard)
-[![Qlty](https://img.shields.io/badge/maintainability-Qlty-6d4aff)](https://qlty.sh/gh/Limen-Neural/projects/plasticity-lab)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/09d0d99d5e71485bae317ba092e99701)](https://app.codacy.com/gh/Limen-Neural/plasticity-lab/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Qlty maintainability](https://qlty.sh/gh/Limen-Neural/projects/plasticity-lab/maintainability.svg)](https://qlty.sh/gh/Limen-Neural/projects/plasticity-lab)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
 
 Reusable SNN learning/training orchestration layer: reward-modulated training loops above [`neuromod`](https://github.com/Limen-Neural/neuromod)'s plasticity primitives.

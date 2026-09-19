@@ -72,12 +72,12 @@ CI-tested platforms: Linux, macOS, and Windows (`ubuntu-latest`, `macos-latest`,
 
 ```toml
 [dependencies]
-plasticity-lab = "0.2.0"
+plasticity-lab = "0.2.1"
 neuromod = "0.6.0"
 rand = "0.10"
 ```
 
-Version `0.2.0` was published on 2026-09-17 and is available from crates.io.
+Version `0.2.1` is the current release candidate; it will be available from crates.io after the release gate completes.
 
 ### 2. Minimal reward-modulated session
 
@@ -141,14 +141,14 @@ To pull in `limbic-critic` as an optional dep and enable the critic → neuromod
 
 ```toml
 # Core only (recommended first step)
-plasticity-lab = "0.2.0"
+plasticity-lab = "0.2.1"
 
 # With the critic bridge
-plasticity-lab = { version = "0.2.0", features = ["critic"] }
+plasticity-lab = { version = "0.2.1", features = ["critic"] }
 limbic-critic = "0.3.0"
 
 # In a browser or Web Worker (combine with `critic` when needed)
-plasticity-lab = { version = "0.2.0", features = ["wasm-js"] }
+plasticity-lab = { version = "0.2.1", features = ["wasm-js"] }
 ```
 
 **When to use default:** you already shape rewards and encode inputs yourself (or use plain `f32` stimuli and scalar rewards, as in the getting-started example). This includes any input-encoding needs — `axon-encoder` is a standalone sibling crate you wire in yourself; this crate never depends on it (see [Architecture brief](#architecture-brief)).

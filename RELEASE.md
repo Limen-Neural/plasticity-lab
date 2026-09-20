@@ -1,10 +1,8 @@
 # Release process
 
-`0.2.1` is the current release candidate. Run this checklist from a clean
-checkout of the exact commit intended for release. Do not tag it or describe
-it as published until `cargo publish` succeeds. The pre-publish final commit
-may carry a planned publication date; it becomes the release date only after a
-successful publish.
+`0.2.1` was published on 2026-09-19. Run this checklist from a clean
+checkout of the exact commit intended for a future release. Do not tag it or
+describe a future version as published until `cargo publish` succeeds.
 
 Capture the release checkout before running any step:
 

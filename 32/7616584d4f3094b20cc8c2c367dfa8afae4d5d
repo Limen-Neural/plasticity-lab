@@ -1,0 +1,19 @@
+.github/workflows/linear-release.yml
+  s_b1a8ac53eab429::t_c6d25b757d8b5a 88
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "327616584d4f3094b20cc8c2c367dfa8afae4d5d",
+  "prompts": {},
+  "sessions": {
+    "s_b1a8ac53eab429": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0b83c-e0a3-7a83-9109-e8784ba50bca",
+        "model": "gpt-5.6-luna"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

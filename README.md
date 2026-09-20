@@ -4,6 +4,7 @@
 [![codecov](https://codecov.io/gh/Limen-Neural/plasticity-lab/branch/main/graph/badge.svg)](https://codecov.io/gh/Limen-Neural/plasticity-lab)
 [![crates.io](https://img.shields.io/crates/v/plasticity-lab.svg)](https://crates.io/crates/plasticity-lab)
 [![docs.rs](https://docs.rs/plasticity-lab/badge.svg)](https://docs.rs/plasticity-lab)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Limen-Neural/plasticity-lab)
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/09d0d99d5e71485bae317ba092e99701)](https://app.codacy.com/gh/Limen-Neural/plasticity-lab/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Qlty maintainability](https://qlty.sh/gh/Limen-Neural/projects/plasticity-lab/maintainability.svg)](https://qlty.sh/gh/Limen-Neural/projects/plasticity-lab)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](https://opensource.org/licenses/MIT)
@@ -77,7 +78,7 @@ neuromod = "0.6.0"
 rand = "0.10"
 ```
 
-Version `0.2.1` is the current release candidate; it will be available from crates.io after the release gate completes.
+Version `0.2.1` was published to crates.io on 2026-09-19.
 
 ### 2. Minimal reward-modulated session
 

@@ -36,12 +36,37 @@ Published to crates.io on 2026-09-19.
 - `RewardMapping` and its validated builder make scalar-reward conversion an
   explicit policy. The default dopamine gain (`0.1`), positive-reward
   norepinephrine suppression (`0.05`), and negative-reward norepinephrine gain
-  (`0.2`) preserve the previous behavior. Missing serialized mapping fields
-  use those defaults, while negative or non-finite coefficients are rejected.
-  `TrainingConfig` owns the mapping; older serialized configs that omit it
-  continue to deserialize with the compatibility defaults.
+  (`0.2`) preserve the previous behavior. Missing mapping fields use those
+  defaults, while negative or non-finite coefficients are rejected.
+  `TrainingConfig` owns the mapping. Compatibility for an omitted
+  `reward_mapping` field is limited to map-based / self-describing formats
+  such as JSON (`#[serde(default)]` supplies missing map keys). Positional or
+  non-self-describing encodings (for example bincode or postcard) do not
+  recover old one-field configs; this crate does not depend on those formats,
+  and tests cover JSON only
+  (`old_and_partial_json_default_missing_reward_mapping_fields`).
 
 ### Changed (breaking)
+
+- `TrainingConfig` gained a public `reward_mapping: RewardMapping` field.
+  Downstream one-field struct literals such as
+  `TrainingConfig { use_reward_modulation: false }` no longer compile; this
+  is an intentional Rust source break for the new public API. In-crate call
+  sites already use `..TrainingConfig::default()` or `with_reward_mapping`.
+
+  **Migration:**
+
+  ```rust
+  // Before (0.2.x)
+  let config = TrainingConfig { use_reward_modulation: false };
+
+  // After
+  let config = TrainingConfig {
+      use_reward_modulation: false,
+      ..TrainingConfig::default()
+  };
+  // or: TrainingConfig::default().with_reward_mapping(...)
+  ```
 
 - Scalar `train_step*` APIs now return `TrainerError` and reject `NaN` and
   ±infinity as `TrainerError::NonFiniteReward` before mutating network or RNG

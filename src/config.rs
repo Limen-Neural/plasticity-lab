@@ -190,10 +190,13 @@ impl<'de> Deserialize<'de> for RewardMapping {
 ///
 /// Values are serializable (serde) so callers can persist them as part of their
 /// own experiment configs or checkpointing setup — this crate does not implement
-/// checkpointing itself. Missing fields deserialize via [`Default`]
-/// (`#[serde(default)]` on the struct), and unknown fields (for example from an
-/// older config that still carries a since-removed knob) are ignored rather
-/// than rejected, since the struct does not use `deny_unknown_fields`.
+/// checkpointing itself. Omitted fields deserialize via [`Default`]
+/// (`#[serde(default)]` on the struct) in map-based / self-describing formats
+/// such as JSON, including older configs that omit `reward_mapping`. That
+/// recovery does not apply to positional or non-self-describing encodings.
+/// Unknown fields (for example from an older config that still carries a
+/// since-removed knob) are ignored rather than rejected, since the struct does
+/// not use `deny_unknown_fields`.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct TrainingConfig {
@@ -201,6 +204,9 @@ pub struct TrainingConfig {
     /// When `false`, the network steps with its current modulators unchanged.
     pub use_reward_modulation: bool,
     /// Validated scalar-reward conversion policy.
+    ///
+    /// When omitted in a map-based / self-describing format such as JSON, this
+    /// field deserializes as [`RewardMapping::default`].
     pub reward_mapping: RewardMapping,
 }
 

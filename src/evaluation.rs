@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use crate::trainer::{PlasticityTrainer, TrainerError, stimulus_invariant};
-use neuromod::{NeuroModulators, SpikingNetwork};
+use neuromod::{NeuroModulators, SpikingNetwork, StepError};
 use rand::Rng;
 
 /// One caller-owned held-out example.
@@ -132,6 +132,17 @@ fn admit_evaluation_batch(
 ) -> Result<(), TrainerError> {
     if data.is_empty() {
         return Err(TrainerError::EmptyBatch);
+    }
+
+    let step_count = i64::try_from(data.len()).map_err(|_| {
+        TrainerError::Step(StepError::StepCounterExhausted {
+            global_step: network.global_step,
+        })
+    })?;
+    if network.global_step < 0 || network.global_step.checked_add(step_count).is_none() {
+        return Err(TrainerError::Step(StepError::StepCounterExhausted {
+            global_step: network.global_step,
+        }));
     }
 
     for (index, example) in data.iter().enumerate() {

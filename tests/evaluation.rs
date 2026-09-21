@@ -260,6 +260,45 @@ fn eval_batch_rejects_a_late_length_mismatch_atomically() {
 }
 
 #[test]
+fn eval_batch_rejects_clock_exhaustion_before_network_or_rng_mutation() {
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+    let mut network = active_network();
+    network.global_step = i64::MAX - 1;
+    let before_network = serde_json::to_string(&network).expect("network snapshot");
+    let held_out = vec![
+        EvaluationExample {
+            stimuli: vec![1.0, 0.8, 0.6],
+        },
+        EvaluationExample {
+            stimuli: vec![0.6, 1.0, 0.8],
+        },
+    ];
+    let mut rng = StdRng::seed_from_u64(1297);
+    let mut untouched_rng = StdRng::seed_from_u64(1297);
+
+    let error = trainer
+        .run_eval_with_rng(
+            &mut network,
+            &held_out,
+            &NeuroModulators::default(),
+            &mut rng,
+        )
+        .expect_err("the complete held-out batch must fit in the network clock");
+
+    assert_eq!(
+        error,
+        TrainerError::Step(StepError::StepCounterExhausted {
+            global_step: i64::MAX - 1,
+        })
+    );
+    assert_eq!(
+        serde_json::to_string(&network).expect("network snapshot"),
+        before_network
+    );
+    assert_eq!(rng.random::<u64>(), untouched_rng.random::<u64>());
+}
+
+#[test]
 fn eval_batches_reuse_the_existing_empty_batch_error() {
     let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
     let mut unseeded_network = active_network();

@@ -283,7 +283,13 @@ encodings such as bincode or postcard; JSON omission is covered by
 neuromodulators from the reward (stimuli still apply), but scalar rewards must
 still be finite.
 
-### Plasticity-frozen held-out evaluation
+### Plasticity-frozen held-out evaluation (unreleased v0.3)
+
+This section describes the development API planned for `plasticity-lab 0.3.0`;
+it is not part of the published `plasticity-lab 0.2.1` package. The current
+implementation is pinned to the exact merged upstream frozen-stepping revision
+while registry packaging waits for `neuromod 0.7.0`. The installation guidance
+above continues to describe the published 0.2.1 API.
 
 Evaluation is caller-owned: prepare a held-out slice of `EvaluationExample`
 values, choose the modulators that should drive runtime dynamics, and call
@@ -396,8 +402,9 @@ Same as `run_session`, plus one `TrainingStepEvent` after each successful `train
 ### `run_eval` / `run_eval_with_rng`
 
 1. Reject empty batches with `TrainerError::EmptyBatch`.
-2. Preflight every held-out stimulus for dimensions and finite values before
-   the first step; seeded rejection consumes no RNG state.
+2. Preflight the network clock capacity and every held-out stimulus for
+   dimensions and finite values before the first step; seeded rejection
+   consumes no RNG state.
 3. Call neuromod's frozen step API with caller-supplied modulators and no
    scalar reward.
 4. Aggregate total and per-neuron spike counts in `EvaluationSummary`.

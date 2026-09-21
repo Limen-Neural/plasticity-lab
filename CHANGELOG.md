@@ -33,6 +33,14 @@ Published to crates.io on 2026-09-19.
 
 ### Added
 
+- `EvaluationExample`, `EvaluationSummary`, `eval_step*`, and `run_eval*`
+  provide caller-owned held-out evaluation through neuromod's frozen stepping.
+  Evaluation takes explicit modulators but no scalar reward, preflights the
+  complete batch before mutation or RNG use, advances runtime dynamics and
+  spike metrics, and preserves plasticity-controlled state bit-for-bit.
+  `use_reward_modulation: false` remains a training option, not an evaluation
+  freeze.
+
 - `RewardMapping` and its validated builder make scalar-reward conversion an
   explicit policy. The default dopamine gain (`0.1`), positive-reward
   norepinephrine suppression (`0.05`), and negative-reward norepinephrine gain

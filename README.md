@@ -283,6 +283,44 @@ encodings such as bincode or postcard; JSON omission is covered by
 neuromodulators from the reward (stimuli still apply), but scalar rewards must
 still be finite.
 
+### Plasticity-frozen held-out evaluation
+
+Evaluation is caller-owned: prepare a held-out slice of `EvaluationExample`
+values, choose the modulators that should drive runtime dynamics, and call
+`run_eval` or `run_eval_with_rng`. Evaluation examples intentionally contain
+stimuli only—there is no scalar reward and this crate does not infer or create
+the train/evaluation split.
+
+```rust
+use neuromod::{NeuroModulators, SpikingNetwork};
+use plasticity_lab::{EvaluationExample, PlasticityTrainer, TrainingConfig};
+use rand::{SeedableRng, rngs::StdRng};
+
+let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+let mut network = SpikingNetwork::with_dimensions(4, 2, 3);
+for neuron in &mut network.neurons {
+    neuron.weights.fill(2.0 / network.num_channels as f32);
+}
+let held_out = vec![
+    EvaluationExample { stimuli: vec![1.0, 0.8, 0.6] },
+    EvaluationExample { stimuli: vec![0.6, 1.0, 0.8] },
+];
+let modulators = NeuroModulators::default();
+let mut rng = StdRng::seed_from_u64(42);
+let summary = trainer
+    .run_eval_with_rng(&mut network, &held_out, &modulators, &mut rng)
+    .unwrap();
+assert_eq!(summary.steps_processed, held_out.len());
+```
+
+The full batch is admitted before its first step. Frozen evaluation advances
+input-spike decisions, membrane/model dynamics, clocks, prediction state,
+inhibition, and observable spikes, while preserving weights, eligibility
+traces, thresholds, adaptive decay state, persistent modulators, and other
+plasticity-controlled state. `use_reward_modulation: false` is **not** an
+evaluation freeze: it disables scalar reward mapping but still runs normal
+plasticity-aware network stepping.
+
 ### Reproducible (seeded) replay
 
 `train_step` / `run_session` still use neuromod's convenience thread-local RNG. For a replayable above-threshold session, pass a seeded generator:
@@ -320,10 +358,12 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 
 | Item | Role |
 |------|------|
-| `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step`, `run_session`, seeded `*_with_rng` variants, and `run_session_with_observer` |
+| `PlasticityTrainer` | Holds `TrainingConfig`; owns training/session APIs plus frozen `eval_step` / `run_eval` and seeded `*_with_rng` variants |
 | `TrainingConfig` | Serializable reward-modulation flag plus a validated `RewardMapping` |
 | `TrainingExample` | One sample: `stimuli: Vec<f32>` + `reward: f32` |
 | `TrainingSummary` | Session metrics after `run_session` |
+| `EvaluationExample` | Caller-owned held-out stimuli with no scalar reward |
+| `EvaluationSummary` | Frozen-evaluation step and spike counts |
 | `TrainingStepEvent` | Borrowed per-step snapshot for observers (no mutable network access) |
 | `TrainingObserver` | Generic callback invoked after each successful session step |
 | `RewardMapping` | Validated scalar-reward policy with compatibility-preserving defaults |
@@ -352,6 +392,17 @@ No per-step event is constructed on this path.
 ### `run_session_with_observer`
 
 Same as `run_session`, plus one `TrainingStepEvent` after each successful `train_step`. Observer failure returns `TrainerError::Observer` and does not step the next example. A failed `train_step` does not emit an event for that example.
+
+### `run_eval` / `run_eval_with_rng`
+
+1. Reject empty batches with `TrainerError::EmptyBatch`.
+2. Preflight every held-out stimulus for dimensions and finite values before
+   the first step; seeded rejection consumes no RNG state.
+3. Call neuromod's frozen step API with caller-supplied modulators and no
+   scalar reward.
+4. Aggregate total and per-neuron spike counts in `EvaluationSummary`.
+5. Leave plasticity-controlled state bit-identical while runtime dynamics and
+   spike observations advance.
 
 ### `TrainingSummary` fields
 
@@ -414,7 +465,7 @@ API docs: run `cargo doc --open` (or `cargo doc --no-deps` in CI-friendly enviro
 
 ### Boundary with neuromod
 
-`plasticity-lab` calls and configures `neuromod`'s plasticity rules through its public API (`SpikingNetwork::step`, `NeuroModulators`) rather than copying the algorithms here. Changes to how STDP or reward-modulated STDP behaves belong in `neuromod`, not in this crate. See [neuromod's own ownership documentation](https://github.com/Limen-Neural/neuromod#scope-and-ownership-boundaries) for its boundary commitments.
+`plasticity-lab` calls and configures `neuromod`'s plasticity rules through its public API (`SpikingNetwork::step`, `SpikingNetwork::step_frozen`, and `NeuroModulators`) rather than copying the algorithms here. Changes to how STDP, reward-modulated STDP, or the frozen-state guarantee behaves belong in `neuromod`, not in this crate. See [neuromod's own ownership documentation](https://github.com/Limen-Neural/neuromod#scope-and-ownership-boundaries) for its boundary commitments.
 
 ### Boundary with SynapticDistill.jl (Linear LIM-25)
 - `plasticity-lab` (Rust): training/session orchestration above `neuromod`'s reward-modulated STDP / Hebbian plasticity primitives; it does not implement those primitives itself.

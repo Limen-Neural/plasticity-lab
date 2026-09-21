@@ -42,4 +42,6 @@ wildcards = "deny"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = []
+# Temporary exact development source for neuromod frozen stepping (PR #162).
+# Remove this exception with the git dependency when registry 0.7.0 lands.
+allow-git = ["https://github.com/Limen-Neural/neuromod"]

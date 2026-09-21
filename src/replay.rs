@@ -36,11 +36,12 @@ struct ExperimentManifest {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 struct DependencyRef {
-    /// Exact registry version and source from Cargo.lock.
+    /// Exact version and immutable registry or git source from Cargo.lock.
     version: String,
     source: String,
-    /// Registry archive checksum, identifying the immutable dependency artifact.
-    checksum: String,
+    /// Registry archive checksum. Git sources are identified by the exact
+    /// commit embedded in `source` and therefore have no checksum field.
+    checksum: Option<String>,
     /// Exact `rand` version that produced `StdRng` draws (not portable across versions).
     rand_version: String,
 }
@@ -78,7 +79,7 @@ fn example_manifest(seed: u64, spec: NetworkSpec, training: TrainingConfig) -> E
         neuromod: DependencyRef {
             version: cargo_lock_field("neuromod", "version").to_string(),
             source: cargo_lock_field("neuromod", "source").to_string(),
-            checksum: cargo_lock_field("neuromod", "checksum").to_string(),
+            checksum: cargo_lock_optional_field("neuromod", "checksum").map(str::to_string),
             rand_version: cargo_lock_field("rand", "version").to_string(),
         },
         training,
@@ -164,6 +165,11 @@ fn capture_tick(tick: usize, spikes: &[usize], network: &SpikingNetwork) -> Tick
 /// Cargo writes string fields one per line. Restricting the lookup to one package
 /// prevents a missing checksum from being read from a following dependency.
 fn cargo_lock_field(package: &str, field: &str) -> &'static str {
+    cargo_lock_optional_field(package, field)
+        .unwrap_or_else(|| panic!("missing {package}.{field} in Cargo.lock"))
+}
+
+fn cargo_lock_optional_field(package: &str, field: &str) -> Option<&'static str> {
     const LOCK: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Cargo.lock"));
     let name_line = format!("name = \"{package}\"");
     let prefix = format!("{field} = \"");
@@ -174,7 +180,6 @@ fn cargo_lock_field(package: &str, field: &str) -> &'static str {
                 .lines()
                 .find_map(|line| line.strip_prefix(&prefix)?.strip_suffix('"'))
         })
-        .unwrap_or_else(|| panic!("missing {package}.{field} in Cargo.lock"))
 }
 
 fn first_diverging_field(left: &TickTrace, right: &TickTrace) -> Option<&'static str> {
@@ -310,7 +315,7 @@ fn assert_replay_matches(spec: NetworkSpec, config: TrainingConfig, seed: u64) {
 }
 
 #[test]
-/// Verifies that replay provenance preserves registry dependency identities.
+/// Verifies that replay provenance preserves immutable dependency identities.
 fn experiment_manifest_round_trips_seed_and_dependency_versions() {
     let spec = NetworkSpec {
         num_lif: 4,
@@ -323,25 +328,34 @@ fn experiment_manifest_round_trips_seed_and_dependency_versions() {
     assert_eq!(manifest, restored);
     assert_eq!(restored.seed, SEED_A);
     assert_eq!(restored.plasticity_lab_version, env!("CARGO_PKG_VERSION"));
-    assert_eq!(
-        restored.neuromod.source,
-        "registry+https://github.com/rust-lang/crates.io-index"
-    );
+    if restored.neuromod.source.starts_with("registry+") {
+        let checksum = restored
+            .neuromod
+            .checksum
+            .as_deref()
+            .expect("registry dependency must record its archive checksum");
+        assert_eq!(checksum.len(), 64);
+        assert!(checksum.bytes().all(|byte| byte.is_ascii_hexdigit()));
+    } else {
+        let source = restored
+            .neuromod
+            .source
+            .strip_prefix("git+https://github.com/Limen-Neural/neuromod?rev=")
+            .expect("development dependency must use the approved neuromod repository");
+        let (requested, resolved) = source
+            .split_once('#')
+            .expect("git lock source must contain its resolved commit");
+        assert_eq!(
+            requested, resolved,
+            "the requested and resolved revisions differ"
+        );
+        assert_eq!(resolved.len(), 40);
+        assert!(resolved.bytes().all(|byte| byte.is_ascii_hexdigit()));
+        assert_eq!(restored.neuromod.checksum, None);
+    }
     assert_eq!(
         restored.neuromod.version,
         cargo_lock_field("neuromod", "version")
-    );
-    assert_eq!(
-        restored.neuromod.checksum,
-        cargo_lock_field("neuromod", "checksum")
-    );
-    assert_eq!(restored.neuromod.checksum.len(), 64);
-    assert!(
-        restored
-            .neuromod
-            .checksum
-            .bytes()
-            .all(|b| b.is_ascii_hexdigit())
     );
     assert_eq!(
         restored.neuromod.rand_version,

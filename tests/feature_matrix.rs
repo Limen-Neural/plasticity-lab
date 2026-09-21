@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use neuromod::SpikingNetwork;
-use plasticity_lab::{PlasticityTrainer, RewardMapping, RewardMappingError, TrainingConfig};
+use plasticity_lab::{
+    EvaluationExample, EvaluationSummary, PlasticityTrainer, RewardMapping, RewardMappingError,
+    TrainingConfig,
+};
 
 #[test]
 fn reward_mapping_types_are_available_from_the_crate_root() {
@@ -24,6 +27,17 @@ fn core_api_steps_without_optional_dependencies() {
         .expect("core training step");
 
     assert_eq!(network.global_step, 1);
+}
+
+#[test]
+fn evaluation_api_is_available_without_optional_dependencies() {
+    let example = EvaluationExample {
+        stimuli: vec![0.0; 4],
+    };
+    let summary = EvaluationSummary::default();
+
+    assert_eq!(example.stimuli.len(), 4);
+    assert_eq!(summary.steps_processed, 0);
 }
 
 #[cfg(feature = "critic")]

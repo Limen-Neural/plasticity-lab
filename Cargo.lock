@@ -85,8 +85,7 @@ checksum = "cf8baf1c55e62ffcace7a9f06f4bd9cd3f0c4beb022d3b367256b91b87513d98"
 [[package]]
 name = "neuromod"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e0a02908726636a6c0ce971df297923914a67766d497c5436facf743c68c329"
+source = "git+https://github.com/Limen-Neural/neuromod?rev=da31dd5d92c2673d5ea01f7acc8b36abd3640f30#da31dd5d92c2673d5ea01f7acc8b36abd3640f30"
 dependencies = [
  "getrandom",
  "rand",

@@ -12,6 +12,11 @@
 //! [`PlasticityTrainer::run_session_with_observer`]). Seeded replay uses
 //! [`PlasticityTrainer::train_step_with_rng`] / [`PlasticityTrainer::run_session_with_rng`]
 //! to inject a caller RNG into neuromod's stochastic input encoding.
+//! Held-out evaluation uses [`PlasticityTrainer::eval_step`] or
+//! [`PlasticityTrainer::run_eval`] (and their caller-RNG variants) to advance
+//! runtime dynamics through neuromod's frozen stepping without retaining
+//! plasticity changes. Evaluation takes explicit modulators but no reward;
+//! callers own the train/held-out split.
 //!
 //! # Features
 //!
@@ -66,6 +71,7 @@
 //! primitives), and common usage patterns.
 
 pub mod config;
+mod evaluation;
 pub mod observer;
 pub mod trainer;
 
@@ -76,6 +82,7 @@ mod replay;
 pub mod bridge;
 
 pub use config::{RewardMapping, RewardMappingBuilder, RewardMappingError, TrainingConfig};
+pub use evaluation::{EvaluationExample, EvaluationSummary};
 pub use observer::{TrainingObserver, TrainingStepEvent};
 pub use trainer::{
     PlasticityTrainer, SampleInvariant, TrainerError, TrainingExample, TrainingSummary,

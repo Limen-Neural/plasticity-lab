@@ -39,8 +39,10 @@ thiserror = "2.0"
 # Same major as neuromod's `rand` so the traits line up.
 rand = "0.10"
 
-# Registry releases provide the seeded-step API and browser entropy feature.
-neuromod = "0.6.0"
+# Temporary exact development pin for frozen stepping from neuromod PR #162.
+# Replace this git source with registry `neuromod = "0.7.0"` before publishing
+# plasticity-lab 0.3.0; the version key is Cargo's publish fallback only.
+neuromod = { version = "0.6.0", git = "https://github.com/Limen-Neural/neuromod", rev = "da31dd5d92c2673d5ea01f7acc8b36abd3640f30" }
 limbic-critic = { version = "0.3.0", optional = true }
 
 [dev-dependencies]

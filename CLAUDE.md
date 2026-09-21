@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Build: `cargo build --all-features`
 - Test all: `cargo test --all-features`
-- Test one: `cargo test --all-features <test_name>` (e.g. `cargo test --all-features train_step_skips_nan_reward_modulation`)
+- Test one: `cargo test --all-features <test_name>` (e.g. `cargo test --all-features train_step_rejects_every_non_finite_reward_before_mutation`)
 - Lint: `cargo clippy --all-targets --all-features -- -D warnings`
 - Format check: `cargo fmt --check`
 - Docs (denies warnings, matches CI): `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`

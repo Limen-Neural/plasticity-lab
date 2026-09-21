@@ -260,13 +260,15 @@ Shape rewards in application code or via [`limbic-critic`](https://github.com/Li
 ```rust
 use plasticity_lab::{RewardMapping, TrainingConfig};
 
-let mapping = RewardMapping::builder()
-    .dopamine_gain(0.1)
-    .positive_norepinephrine_suppression(0.05)
-    .negative_norepinephrine_gain(0.2)
-    .build()?;
-let config = TrainingConfig::default().with_reward_mapping(mapping);
-# Ok::<(), plasticity_lab::RewardMappingError>(())
+fn main() -> Result<(), plasticity_lab::RewardMappingError> {
+    let mapping = RewardMapping::builder()
+        .dopamine_gain(0.1)
+        .positive_norepinephrine_suppression(0.05)
+        .negative_norepinephrine_gain(0.2)
+        .build()?;
+    let config = TrainingConfig::default().with_reward_mapping(mapping);
+    Ok(())
+}
 ```
 
 Those coefficients exactly match the compatibility defaults. The builder

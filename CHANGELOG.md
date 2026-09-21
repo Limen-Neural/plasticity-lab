@@ -53,6 +53,8 @@ Published to crates.io on 2026-09-19.
   `TrainingConfig { use_reward_modulation: false }` no longer compile; this
   is an intentional Rust source break for the new public API. In-crate call
   sites already use `..TrainingConfig::default()` or `with_reward_mapping`.
+  `TrainingConfig` also no longer implements `Eq`, because `RewardMapping`
+  stores `f32` coefficients (`PartialEq` remains).
 
   **Migration:**
 
@@ -68,15 +70,33 @@ Published to crates.io on 2026-09-19.
   // or: TrainingConfig::default().with_reward_mapping(...)
   ```
 
+  Call sites that required `TrainingConfig: Eq` no longer compile. Do not
+  reach for `HashSet<TrainingConfig>` as a substitute; `TrainingConfig` did
+  not implement `Hash` before either. Use a `PartialEq` comparison, or drop
+  the `Eq` bound:
+
+  ```rust
+  // Before (0.2.x)
+  fn needs_eq<T: Eq>(_: &T) {}
+  needs_eq(&TrainingConfig::default());
+
+  // After
+  fn needs_eq<T: PartialEq>(_: &T) {}
+  needs_eq(&TrainingConfig::default());
+  ```
+
 - Scalar `train_step*` APIs now return `TrainerError` and reject `NaN` and
   ±infinity as `TrainerError::NonFiniteReward` before mutating network or RNG
   state. Batch APIs preflight every reward before the first step. Explicit
   modulator and critic step errors are also wrapped consistently as
-  `TrainerError::Step`.
+  `TrainerError::Step`. `SampleInvariant::InfiniteReward` is removed;
+  infinite rewards are no longer a sample-invariant variant.
 
   **Migration:** callers that previously returned or matched `StepError`
   directly should handle `TrainerError` and match network failures through
-  `TrainerError::Step(error)`.
+  `TrainerError::Step(error)`. Match `SampleInvariant::InfiniteReward` as
+  `TrainerError::NonFiniteReward { index }` instead (`index: None` on direct
+  steps, `Some(sample_index)` on batch APIs).
 
 ## [0.2.0] - 2026-09-17
 

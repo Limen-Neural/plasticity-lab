@@ -1,0 +1,47 @@
+README.md
+  s_b1a8ac53eab429::t_2d551e589a70ff 229-230,232,250,261-269,272-278,309
+  s_b1a8ac53eab429::t_1ac11f16243cae 323-325,330,332,340,356
+  s_b1a8ac53eab429::t_ce228406370bfd 318,337
+CLAUDE.md
+  s_b1a8ac53eab429::t_1ac11f16243cae 47,55
+tests/feature_matrix.rs
+  s_b1a8ac53eab429::t_bd4c9c01eb8bcc 4-15
+src/lib.rs
+  s_b1a8ac53eab429::t_7627abbba2bbb0 78
+src/config.rs
+  s_b1a8ac53eab429::t_0abf58319ccdb3 3-181,183-186,188-189,208,214-223,230,255
+  s_b1a8ac53eab429::t_694a97a30a7f8d 237,291-348,350-361,363-366,368-370
+  s_b1a8ac53eab429::t_20f3423049b43b 367
+CHANGELOG.md
+  s_b1a8ac53eab429::t_2d551e589a70ff 34-40,43-55
+  s_b1a8ac53eab429::t_ce228406370bfd 41-42
+  s_b1a8ac53eab429::t_1ac11f16243cae 115
+src/replay.rs
+  s_b1a8ac53eab429::t_d8b4ba65273326 390
+src/trainer.rs
+  s_b1a8ac53eab429::t_2d551e589a70ff 134-137,242,254,302-304,435-436
+  s_b1a8ac53eab429::t_6819aa8ed9ac6c 46-47,69-73,75,139,145-146,148-150,183-184,186-188,202-205,215-218,231,270,318,342-343,348-352,354-358,451
+  s_b1a8ac53eab429::t_d38050138bdc0f 640,736-753,755-756,758,760-767,771-776,778-780,782,784-785,820-846
+  s_b1a8ac53eab429::t_0809ea7ad6ca1a 74,593,618-623
+  s_b1a8ac53eab429::t_d8b4ba65273326 725
+  s_b1a8ac53eab429::t_944a3b1171f4c7 1058,1061-1062,1077-1079,1081-1082,1086,1089-1090,1094,1101-1104,1106-1108,1481,1486,1489,1492,1634-1653
+  s_b1a8ac53eab429::t_052c482c5149fb 847
+  s_b1a8ac53eab429::t_27bc1c58fd881f 1497-1500,1502-1529,1654-1657,1662-1664,1667-1670,1672
+  s_b1a8ac53eab429::t_1ccbb32415be40 642,759
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "090d809a9da75ab7467ec79dfb2c20c823e5d5ca",
+  "prompts": {},
+  "sessions": {
+    "s_b1a8ac53eab429": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0b83c-e0a3-7a83-9109-e8784ba50bca",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

@@ -53,6 +53,12 @@ Published to crates.io on 2026-09-19.
   directly should handle `TrainerError` and match network failures through
   `TrainerError::Step(error)`.
 
+- `TrainingConfig` adds the public `reward_mapping` field. Existing struct
+  literals must use `..TrainingConfig::default()` or set the validated mapping
+  explicitly. This source break is intentional for the planned pre-1.0 v0.3
+  API; previously serialized one-field configurations still default the
+  appended mapping, including positional Serde representations.
+
 ## [0.2.0] - 2026-09-17
 
 Published to crates.io on 2026-09-17.

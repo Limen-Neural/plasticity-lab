@@ -226,7 +226,7 @@ impl Default for TrainingConfig {
 #[cfg(test)]
 mod tests {
     use super::{RewardMapping, RewardMappingError, TrainingConfig};
-    use serde_test::{Token, assert_tokens};
+    use serde_test::{Token, assert_de_tokens, assert_tokens};
 
     #[test]
     fn default_enables_reward_modulation() {
@@ -277,6 +277,21 @@ mod tests {
                 Token::Str("negative_norepinephrine_gain"),
                 Token::F32(0.2),
                 Token::StructEnd,
+            ],
+        );
+    }
+
+    #[test]
+    fn old_positional_training_config_defaults_the_appended_mapping() {
+        assert_de_tokens(
+            &TrainingConfig {
+                use_reward_modulation: false,
+                ..TrainingConfig::default()
+            },
+            &[
+                Token::Seq { len: Some(1) },
+                Token::Bool(false),
+                Token::SeqEnd,
             ],
         );
     }

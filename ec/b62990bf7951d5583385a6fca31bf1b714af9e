@@ -1,0 +1,21 @@
+src/config.rs
+  s_b1a8ac53eab429::t_a45f60edf37e76 25,31,37,43,50,70,77,84,91,111,133,153,164,209,217
+src/trainer.rs
+  s_b1a8ac53eab429::t_a45f60edf37e76 111,147,185,206,219,237,272,319,353,455,634
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "ecb62990bf7951d5583385a6fca31bf1b714af9e",
+  "prompts": {},
+  "sessions": {
+    "s_b1a8ac53eab429": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0b83c-e0a3-7a83-9109-e8784ba50bca",
+        "model": "gpt-5.6-sol"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

@@ -108,6 +108,7 @@ pub enum TrainerError {
     },
 }
 
+#[cfg_attr(test, inline(never))]
 fn reward_index_suffix(index: &Option<usize>) -> String {
     index
         .map(|index| format!(" at sample {index}"))
@@ -143,6 +144,7 @@ impl PlasticityTrainer {
     /// state changes, even when reward modulation is disabled.
     ///
     /// Returns indices of neurons that spiked, or a [`TrainerError`].
+    #[cfg_attr(test, inline(never))]
     pub fn train_step(
         &mut self,
         network: &mut SpikingNetwork,
@@ -180,6 +182,7 @@ impl PlasticityTrainer {
     ///     .unwrap();
     /// assert!(spikes.iter().all(|&i| i < 4));
     /// ```
+    #[cfg_attr(test, inline(never))]
     pub fn train_step_with_rng<R: Rng + ?Sized>(
         &mut self,
         network: &mut SpikingNetwork,
@@ -200,6 +203,7 @@ impl PlasticityTrainer {
     /// should convert via `crate::to_neuromodulators` (`critic` feature; a
     /// plain code span, not a doc link — that item doesn't exist without the
     /// feature) and pass the result here.
+    #[cfg_attr(test, inline(never))]
     pub fn train_step_with_modulators(
         &mut self,
         network: &mut SpikingNetwork,
@@ -212,6 +216,7 @@ impl PlasticityTrainer {
     }
 
     /// Same as [`Self::train_step_with_modulators`], with a caller-supplied RNG.
+    #[cfg_attr(test, inline(never))]
     pub fn train_step_with_modulators_and_rng<R: Rng + ?Sized>(
         &mut self,
         network: &mut SpikingNetwork,
@@ -229,6 +234,7 @@ impl PlasticityTrainer {
     /// Converts via [`crate::bridge::to_neuromodulators`] then steps. Available only
     /// with the `critic` feature.
     #[cfg(feature = "critic")]
+    #[cfg_attr(test, inline(never))]
     pub fn train_step_from_critic(
         &mut self,
         network: &mut SpikingNetwork,
@@ -263,6 +269,7 @@ impl PlasticityTrainer {
     ///   state are unchanged.
     /// - [`TrainerError::Step`] if a network step fails after admission (for
     ///   example a `StepError` that cannot be seen from the example alone).
+    #[cfg_attr(test, inline(never))]
     pub fn run_session(
         &mut self,
         network: &mut SpikingNetwork,
@@ -309,6 +316,7 @@ impl PlasticityTrainer {
     /// - [`TrainerError::InvalidSample`] if any stimulus has the wrong length
     ///   or contains a non-finite value.
     /// - [`TrainerError::Step`] if any network step fails.
+    #[cfg_attr(test, inline(never))]
     pub fn run_session_with_rng<R: Rng + ?Sized>(
         &mut self,
         network: &mut SpikingNetwork,
@@ -342,6 +350,7 @@ impl PlasticityTrainer {
     }
 
     /// Computes the modulator vector `train_step` would pass into `network.step`.
+    #[cfg_attr(test, inline(never))]
     fn modulators_for_reward(&self, network: &SpikingNetwork, reward: f32) -> NeuroModulators {
         let mut modulators: NeuroModulators = network.modulators;
 
@@ -443,6 +452,7 @@ impl PlasticityTrainer {
     /// - [`TrainerError::Step`] if a network step fails (observer is not called
     ///   for that failed step; earlier steps have already been observed).
     /// - [`TrainerError::Observer`] if `observer` returns an error.
+    #[cfg_attr(test, inline(never))]
     pub fn run_session_with_observer<O: TrainingObserver>(
         &mut self,
         network: &mut SpikingNetwork,
@@ -621,6 +631,7 @@ fn sample_invariant(
     None
 }
 
+#[cfg_attr(test, inline(never))]
 fn require_finite_reward(reward: f32, index: Option<usize>) -> Result<(), TrainerError> {
     if reward.is_finite() {
         Ok(())

@@ -22,27 +22,32 @@ pub struct RewardMapping {
 
 impl RewardMapping {
     /// Starts a fluent builder with the compatibility defaults.
+    #[cfg_attr(test, inline(never))]
     pub fn builder() -> RewardMappingBuilder {
         RewardMappingBuilder::default()
     }
 
     /// Dopamine delta per unit positive or negative scalar reward.
+    #[cfg_attr(test, inline(never))]
     pub fn dopamine_gain(self) -> f32 {
         self.dopamine_gain
     }
 
     /// Norepinephrine suppression per unit positive reward.
+    #[cfg_attr(test, inline(never))]
     pub fn positive_norepinephrine_suppression(self) -> f32 {
         self.positive_norepinephrine_suppression
     }
 
     /// Norepinephrine gain per unit negative reward magnitude.
+    #[cfg_attr(test, inline(never))]
     pub fn negative_norepinephrine_gain(self) -> f32 {
         self.negative_norepinephrine_gain
     }
 }
 
 impl Default for RewardMapping {
+    #[cfg_attr(test, inline(never))]
     fn default() -> Self {
         Self {
             dopamine_gain: DEFAULT_DOPAMINE_GAIN,
@@ -62,24 +67,28 @@ pub struct RewardMappingBuilder {
 
 impl RewardMappingBuilder {
     /// Sets dopamine delta per unit scalar reward.
+    #[cfg_attr(test, inline(never))]
     pub fn dopamine_gain(mut self, value: f32) -> Self {
         self.dopamine_gain = value;
         self
     }
 
     /// Sets norepinephrine suppression per unit positive reward.
+    #[cfg_attr(test, inline(never))]
     pub fn positive_norepinephrine_suppression(mut self, value: f32) -> Self {
         self.positive_norepinephrine_suppression = value;
         self
     }
 
     /// Sets norepinephrine gain per unit negative reward magnitude.
+    #[cfg_attr(test, inline(never))]
     pub fn negative_norepinephrine_gain(mut self, value: f32) -> Self {
         self.negative_norepinephrine_gain = value;
         self
     }
 
     /// Validates and builds the mapping.
+    #[cfg_attr(test, inline(never))]
     pub fn build(self) -> Result<RewardMapping, RewardMappingError> {
         validate_coefficient("dopamine_gain", self.dopamine_gain)?;
         validate_coefficient(
@@ -99,6 +108,7 @@ impl RewardMappingBuilder {
 }
 
 impl Default for RewardMappingBuilder {
+    #[cfg_attr(test, inline(never))]
     fn default() -> Self {
         let mapping = RewardMapping::default();
         Self {
@@ -120,6 +130,7 @@ pub enum RewardMappingError {
     NegativeCoefficient { name: &'static str },
 }
 
+#[cfg_attr(test, inline(never))]
 fn validate_coefficient(name: &'static str, value: f32) -> Result<(), RewardMappingError> {
     if !value.is_finite() {
         return Err(RewardMappingError::NonFiniteCoefficient { name });
@@ -139,6 +150,7 @@ struct RewardMappingData {
 }
 
 impl Default for RewardMappingData {
+    #[cfg_attr(test, inline(never))]
     fn default() -> Self {
         Self {
             dopamine_gain: DEFAULT_DOPAMINE_GAIN,
@@ -149,6 +161,7 @@ impl Default for RewardMappingData {
 }
 
 impl<'de> Deserialize<'de> for RewardMapping {
+    #[cfg_attr(test, inline(never))]
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -193,6 +206,7 @@ pub struct TrainingConfig {
 
 impl TrainingConfig {
     /// Returns a copy configured with `reward_mapping`.
+    #[cfg_attr(test, inline(never))]
     pub fn with_reward_mapping(mut self, reward_mapping: RewardMapping) -> Self {
         self.reward_mapping = reward_mapping;
         self
@@ -200,6 +214,7 @@ impl TrainingConfig {
 }
 
 impl Default for TrainingConfig {
+    #[cfg_attr(test, inline(never))]
     fn default() -> Self {
         Self {
             use_reward_modulation: true,

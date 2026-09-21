@@ -193,7 +193,8 @@ impl<'de> Deserialize<'de> for RewardMapping {
 /// checkpointing itself. Omitted fields deserialize via [`Default`]
 /// (`#[serde(default)]` on the struct) in map-based / self-describing formats
 /// such as JSON, including older configs that omit `reward_mapping`. That
-/// recovery does not apply to positional or non-self-describing encodings.
+/// omitted-field compatibility is not a guarantee for positional or
+/// non-self-describing encodings such as bincode or postcard.
 /// Unknown fields (for example from an older config that still carries a
 /// since-removed knob) are ignored rather than rejected, since the struct does
 /// not use `deny_unknown_fields`.

@@ -40,11 +40,11 @@ Published to crates.io on 2026-09-19.
   defaults, while negative or non-finite coefficients are rejected.
   `TrainingConfig` owns the mapping. Compatibility for an omitted
   `reward_mapping` field is limited to map-based / self-describing formats
-  such as JSON (`#[serde(default)]` supplies missing map keys). Positional or
-  non-self-describing encodings (for example bincode or postcard) do not
-  recover old one-field configs; this crate does not depend on those formats,
-  and tests cover JSON only
-  (`old_and_partial_json_default_missing_reward_mapping_fields`).
+  such as JSON (`#[serde(default)]` supplies missing map keys). It is not a
+  compatibility guarantee for positional or non-self-describing encodings
+  such as bincode or postcard; this crate does not depend on those formats.
+  JSON omission is covered by
+  `old_and_partial_json_default_missing_reward_mapping_fields`.
 
 ### Changed (breaking)
 
@@ -77,12 +77,6 @@ Published to crates.io on 2026-09-19.
   **Migration:** callers that previously returned or matched `StepError`
   directly should handle `TrainerError` and match network failures through
   `TrainerError::Step(error)`.
-
-- `TrainingConfig` adds the public `reward_mapping` field. Existing struct
-  literals must use `..TrainingConfig::default()` or set the validated mapping
-  explicitly. This source break is intentional for the planned pre-1.0 v0.3
-  API; previously serialized one-field configurations still default the
-  appended mapping, including positional Serde representations.
 
 ## [0.2.0] - 2026-09-17
 

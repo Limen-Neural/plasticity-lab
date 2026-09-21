@@ -274,9 +274,9 @@ rejects negative, `NaN`, and infinite coefficients, and deserialization applies
 the same validation. Older `TrainingConfig` documents that omit
 `reward_mapping` continue to load with those defaults in map-based /
 self-describing formats such as JSON (`#[serde(default)]` fills missing map
-keys). Positional encodings do not recover an omitted `reward_mapping` field;
-this crate tests JSON only
-(`old_and_partial_json_default_missing_reward_mapping_fields`). Set
+keys). That compatibility is not claimed for positional or non-self-describing
+encodings such as bincode or postcard; JSON omission is covered by
+`old_and_partial_json_default_missing_reward_mapping_fields`. Set
 `use_reward_modulation: false` to step the network without adjusting
 neuromodulators from the reward (stimuli still apply), but scalar rewards must
 still be finite.

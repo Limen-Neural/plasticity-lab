@@ -44,7 +44,7 @@ Source layout (`src/`):
   - `train_step` — applies scalar-reward → neuromodulator shift, then steps the network
   - `train_step_with_modulators` — steps with explicit `NeuroModulators`, no reward math
   - `train_step_from_critic` (`critic` feature only) — converts a `limbic_critic::ModulatorVector` via `bridge`, then calls `train_step_with_modulators`
-  - `run_session` — admits the whole batch first (dimensions, finite stimuli, infinite reward) so a late invalid sample cannot leave earlier samples applied; then snapshots per-neuron thresholds/weights, replays `train_step` over each `TrainingExample`, and diffs against the snapshot to build `TrainingSummary` (`threshold_drifts`, `weight_drifts`, `per_neuron_spikes`, `avg_reward`)
+  - `run_session` — admits the whole batch first (dimensions, finite stimuli, finite rewards) so a late invalid sample cannot leave earlier samples applied; then snapshots per-neuron thresholds/weights, replays `train_step` over each `TrainingExample`, and diffs against the snapshot to build `TrainingSummary` (`threshold_drifts`, `weight_drifts`, `per_neuron_spikes`, `avg_reward`)
   - `run_session_with_observer` — same preflight and loop, plus one borrowed `TrainingStepEvent` after each successful step; observer `Err` aborts before the next example (`TrainerError::Observer`)
 - `observer.rs` — `TrainingObserver` trait and borrowed `TrainingStepEvent` (no mutable network access)
 - `config.rs` — `TrainingConfig`; always deserializes via `#[serde(default)]` on the struct so partial/old configs stay forward-compatible
@@ -52,7 +52,7 @@ Source layout (`src/`):
 
 One behavioral detail that isn't obvious from the public API alone:
 
-- `train_step`'s reward→modulator shift is asymmetric and NaN-guarded: positive reward moves dopamine/norepinephrine by different coefficients (0.1/0.05) than negative reward does (0.1/0.2), all clamped to `[0.0, 1.0]`; `reward.is_nan()` skips modulation entirely because `clamp` doesn't protect against this — a NaN receiver passes straight through unclamped (`NaN.clamp(0.0, 1.0)` is `NaN`, not a panic), which would otherwise poison the modulator state for every subsequent step.
+- `train_step`'s reward→modulator shift is controlled by a validated `RewardMapping`; its compatibility defaults retain the asymmetric 0.1/0.05 positive and 0.1/0.2 negative behavior, all clamped to `[0.0, 1.0]`. Every scalar API rejects NaN and ±infinity as `TrainerError::NonFiniteReward` before network or RNG mutation.
 
 ## Ecosystem/ownership boundaries
 

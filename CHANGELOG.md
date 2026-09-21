@@ -31,6 +31,28 @@ Published to crates.io on 2026-09-19.
 
 ## [Unreleased]
 
+### Added
+
+- `RewardMapping` and its validated builder make scalar-reward conversion an
+  explicit policy. The default dopamine gain (`0.1`), positive-reward
+  norepinephrine suppression (`0.05`), and negative-reward norepinephrine gain
+  (`0.2`) preserve the previous behavior. Missing serialized mapping fields
+  use those defaults, while negative or non-finite coefficients are rejected.
+  `TrainingConfig` owns the mapping; older serialized configs that omit it
+  continue to deserialize with the compatibility defaults.
+
+### Changed (breaking)
+
+- Scalar `train_step*` APIs now return `TrainerError` and reject `NaN` and
+  ±infinity as `TrainerError::NonFiniteReward` before mutating network or RNG
+  state. Batch APIs preflight every reward before the first step. Explicit
+  modulator and critic step errors are also wrapped consistently as
+  `TrainerError::Step`.
+
+  **Migration:** callers that previously returned or matched `StepError`
+  directly should handle `TrainerError` and match network failures through
+  `TrainerError::Step(error)`.
+
 ## [0.2.0] - 2026-09-17
 
 Published to crates.io on 2026-09-17.
@@ -90,6 +112,7 @@ Published to crates.io on 2026-09-17.
   // After
   let config = TrainingConfig {
       use_reward_modulation: true,
+      ..TrainingConfig::default()
   };
   ```
 

@@ -75,7 +75,7 @@ mod replay;
 #[cfg(feature = "critic")]
 pub mod bridge;
 
-pub use config::TrainingConfig;
+pub use config::{RewardMapping, RewardMappingBuilder, RewardMappingError, TrainingConfig};
 pub use observer::{TrainingObserver, TrainingStepEvent};
 pub use trainer::{
     PlasticityTrainer, SampleInvariant, TrainerError, TrainingExample, TrainingSummary,

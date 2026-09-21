@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 
 use neuromod::SpikingNetwork;
-use plasticity_lab::{PlasticityTrainer, TrainingConfig};
+use plasticity_lab::{PlasticityTrainer, RewardMapping, RewardMappingError, TrainingConfig};
+
+#[test]
+fn reward_mapping_types_are_available_from_the_crate_root() {
+    let mapping = RewardMapping::builder()
+        .dopamine_gain(0.25)
+        .build()
+        .expect("valid public reward mapping");
+
+    assert_eq!(mapping.dopamine_gain(), 0.25);
+    let _: Option<RewardMappingError> = None;
+}
 
 #[test]
 fn core_api_steps_without_optional_dependencies() {

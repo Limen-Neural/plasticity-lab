@@ -226,10 +226,10 @@ A JSONL writer belongs in application code, not this crate — see `examples/jso
 Drive the network yourself when rewards are online or adaptive:
 
 ```rust
-use neuromod::{SpikingNetwork, StepError};
-use plasticity_lab::{PlasticityTrainer, TrainingConfig};
+use neuromod::SpikingNetwork;
+use plasticity_lab::{PlasticityTrainer, TrainerError, TrainingConfig};
 
-fn main() -> Result<(), StepError> {
+fn main() -> Result<(), TrainerError> {
     let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
     let mut network = SpikingNetwork::with_dimensions(32, 8, 64);
 
@@ -247,7 +247,7 @@ fn main() -> Result<(), StepError> {
 
 - Finite positive → dopamine up / norepinephrine down (clamped)
 - Finite negative → norepinephrine up / dopamine adjusted (clamped)
-- `NaN` or ±infinity → no neuromodulator update in `train_step` (`NaN` is omitted from session `avg_reward`; ±infinity is rejected by `run_session` preflight)
+- `NaN` or ±infinity → `TrainerError::NonFiniteReward`, before network or caller-owned RNG state changes
 
 Shape rewards in application code or via [`limbic-critic`](https://github.com/Limen-Neural/limbic-critic) when using the `critic` feature.
 
@@ -258,14 +258,24 @@ Shape rewards in application code or via [`limbic-critic`](https://github.com/Li
 ### Configuring the trainer
 
 ```rust
-use plasticity_lab::TrainingConfig;
+use plasticity_lab::{RewardMapping, TrainingConfig};
 
-let config = TrainingConfig {
-    use_reward_modulation: true,
-};
+let mapping = RewardMapping::builder()
+    .dopamine_gain(0.1)
+    .positive_norepinephrine_suppression(0.05)
+    .negative_norepinephrine_gain(0.2)
+    .build()?;
+let config = TrainingConfig::default().with_reward_mapping(mapping);
+# Ok::<(), plasticity_lab::RewardMappingError>(())
 ```
 
-`TrainingConfig::default()` matches the value above. Set `use_reward_modulation: false` to step the network without adjusting neuromodulators from the reward (stimuli still apply).
+Those coefficients exactly match the compatibility defaults. The builder
+rejects negative, `NaN`, and infinite coefficients, and deserialization applies
+the same validation. Older serialized `TrainingConfig` values that omit
+`reward_mapping` continue to load with those defaults. Set
+`use_reward_modulation: false` to step the network without adjusting
+neuromodulators from the reward (stimuli still apply), but scalar rewards must
+still be finite.
 
 ### Reproducible (seeded) replay
 
@@ -296,7 +306,7 @@ A starting seed replays a session from the beginning given the same network chec
 
 Checkpointing is still application-owned. Persist the network (neuromod already serde's `SpikingNetwork`) together with that RNG state. This crate does not ingest replay files.
 
-`TrainingConfig` only exposes fields that drive an explicit code path in `train_step`. It does not expose a `learning_rate`, homeostasis setpoint, or `batch_size` knob: low-level STDP / homeostasis tuning is owned by `neuromod::SpikingNetwork`, which derives its own learning rate and thresholds from neuromodulator state, and batches are passed directly as `&[TrainingExample]` slices to `run_session` rather than configured. See `CHANGELOG.md` for the migration note if you are upgrading from a config that set those fields.
+`TrainingConfig` only exposes fields that drive an explicit code path in `train_step`. It does not expose a `learning_rate`, homeostasis setpoint, or `batch_size` knob: low-level STDP / homeostasis tuning is owned by `neuromod::SpikingNetwork`, which derives its own learning rate and thresholds from neuromodulator state, and batches are passed directly as `&[TrainingExample]` slices to `run_session` rather than configured. Scalar step APIs now return `TrainerError`, wrapping neuromod's `StepError` as `TrainerError::Step`; this makes invalid rewards explicit and consistent across scalar, explicit-modulator, and critic paths. See `CHANGELOG.md` for migration notes.
 
 ## Architecture brief
 
@@ -305,28 +315,29 @@ This section describes **this crate only**. Network dynamics, neuromodulator sta
 | Item | Role |
 |------|------|
 | `PlasticityTrainer` | Holds `TrainingConfig`; owns `train_step`, `run_session`, seeded `*_with_rng` variants, and `run_session_with_observer` |
-| `TrainingConfig` | Serializable knobs (currently just the reward-modulation flag) |
+| `TrainingConfig` | Serializable reward-modulation flag plus a validated `RewardMapping` |
 | `TrainingExample` | One sample: `stimuli: Vec<f32>` + `reward: f32` |
 | `TrainingSummary` | Session metrics after `run_session` |
 | `TrainingStepEvent` | Borrowed per-step snapshot for observers (no mutable network access) |
 | `TrainingObserver` | Generic callback invoked after each successful session step |
-| `TrainerError` | `EmptyBatch`, `InvalidSample { index, reason }`, wrapped `StepError` from neuromod, or `Observer` abort |
-| `SampleInvariant` | Which batch-admission check failed (length, non-finite stimulus, infinite reward) |
+| `RewardMapping` | Validated scalar-reward policy with compatibility-preserving defaults |
+| `TrainerError` | `NonFiniteReward`, `EmptyBatch`, `InvalidSample { index, reason }`, wrapped `StepError` from neuromod, or `Observer` abort |
+| `SampleInvariant` | Which structural batch-admission check failed (length or non-finite stimulus) |
 
 ### `train_step`
 
 1. Reads current neuromodulators from the network.
-2. If `use_reward_modulation` is `true` (default), adjusts dopamine / norepinephrine from a finite scalar `reward` (clamped to `[0, 1]`); non-finite rewards (`NaN` and ±infinity) skip modulation. Otherwise leaves modulators unchanged.
+2. Rejects a non-finite scalar reward before mutation. If `use_reward_modulation` is `true` (default), adjusts dopamine / norepinephrine through the configured `RewardMapping` (clamped to `[0, 1]`). Otherwise leaves modulators unchanged.
 3. Calls `network.step(stimuli, &modulators)`.
-4. Returns spike indices (`Vec<usize>`) or `StepError`.
+4. Returns spike indices (`Vec<usize>`) or `TrainerError` (`StepError` is wrapped as `TrainerError::Step`).
 
 ### `run_session`
 
 1. Rejects empty batches (`TrainerError::EmptyBatch`) without mutating the network.
-2. Preflights every example (stimulus length vs `num_channels`, finite stimuli, infinite reward) and returns `TrainerError::InvalidSample { index, reason }` on the first failure — still with no mutation.
+2. Preflights every example (stimulus length vs `num_channels`, finite stimuli, finite reward) and returns indexed `TrainerError::InvalidSample` or `TrainerError::NonFiniteReward` on the first failure — still with no mutation.
 3. Snapshots thresholds and weights.
 4. Calls `train_step` for each `TrainingExample` in slice order.
-5. Aggregates spikes and average reward (non-finite rewards are omitted from the mean, matching `train_step`; infinite rewards never reach this step because preflight rejects them).
+5. Aggregates spikes and average reward. Every admitted reward is finite.
 6. Records per-neuron threshold and weight drifts vs. session start.
 7. Returns `TrainingSummary`.
 
@@ -342,7 +353,7 @@ Same as `run_session`, plus one `TrainingStepEvent` after each successful `train
 |-------|---------|
 | `steps_processed` | Number of examples run |
 | `total_spikes` | Sum of spike events across steps |
-| `avg_reward` | Mean of finite example rewards (`0.0` when none are finite) |
+| `avg_reward` | Mean reward across admitted examples |
 | `threshold_drifts` | Per-neuron Δthreshold over the session |
 | `weight_drifts` | Per-neuron per-channel Δweight over the session |
 | `per_neuron_spikes` | Spike counts per neuron |

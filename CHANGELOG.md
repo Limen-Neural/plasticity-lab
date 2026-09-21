@@ -31,6 +31,73 @@ Published to crates.io on 2026-09-19.
 
 ## [Unreleased]
 
+### Added
+
+- `RewardMapping` and its validated builder make scalar-reward conversion an
+  explicit policy. The default dopamine gain (`0.1`), positive-reward
+  norepinephrine suppression (`0.05`), and negative-reward norepinephrine gain
+  (`0.2`) preserve the previous behavior. Missing mapping fields use those
+  defaults, while negative or non-finite coefficients are rejected.
+  `TrainingConfig` owns the mapping. Compatibility for an omitted
+  `reward_mapping` field is limited to map-based / self-describing formats
+  such as JSON (`#[serde(default)]` supplies missing map keys). It is not a
+  compatibility guarantee for positional or non-self-describing encodings
+  such as bincode or postcard; this crate does not depend on those formats.
+  JSON omission is covered by
+  `old_and_partial_json_default_missing_reward_mapping_fields`.
+
+### Changed (breaking)
+
+- `TrainingConfig` gained a public `reward_mapping: RewardMapping` field.
+  Downstream one-field struct literals such as
+  `TrainingConfig { use_reward_modulation: false }` no longer compile; this
+  is an intentional Rust source break for the new public API. In-crate call
+  sites already use `..TrainingConfig::default()` or `with_reward_mapping`.
+  `TrainingConfig` also no longer implements `Eq`, because `RewardMapping`
+  stores `f32` coefficients (`PartialEq` remains).
+
+  **Migration:**
+
+  ```rust
+  // Before (0.2.x)
+  let config = TrainingConfig { use_reward_modulation: false };
+
+  // After
+  let config = TrainingConfig {
+      use_reward_modulation: false,
+      ..TrainingConfig::default()
+  };
+  // or: TrainingConfig::default().with_reward_mapping(...)
+  ```
+
+  Call sites that required `TrainingConfig: Eq` no longer compile. Do not
+  reach for `HashSet<TrainingConfig>` as a substitute; `TrainingConfig` did
+  not implement `Hash` before either. Use a `PartialEq` comparison, or drop
+  the `Eq` bound:
+
+  ```rust
+  // Before (0.2.x)
+  fn needs_eq<T: Eq>(_: &T) {}
+  needs_eq(&TrainingConfig::default());
+
+  // After
+  fn needs_eq<T: PartialEq>(_: &T) {}
+  needs_eq(&TrainingConfig::default());
+  ```
+
+- Scalar `train_step*` APIs now return `TrainerError` and reject `NaN` and
+  ±infinity as `TrainerError::NonFiniteReward` before mutating network or RNG
+  state. Batch APIs preflight every reward before the first step. Explicit
+  modulator and critic step errors are also wrapped consistently as
+  `TrainerError::Step`. `SampleInvariant::InfiniteReward` is removed;
+  infinite rewards are no longer a sample-invariant variant.
+
+  **Migration:** callers that previously returned or matched `StepError`
+  directly should handle `TrainerError` and match network failures through
+  `TrainerError::Step(error)`. Match `SampleInvariant::InfiniteReward` as
+  `TrainerError::NonFiniteReward { index }` instead (`index: None` on direct
+  steps, `Some(sample_index)` on batch APIs).
+
 ## [0.2.0] - 2026-09-17
 
 Published to crates.io on 2026-09-17.
@@ -90,6 +157,7 @@ Published to crates.io on 2026-09-17.
   // After
   let config = TrainingConfig {
       use_reward_modulation: true,
+      ..TrainingConfig::default()
   };
   ```
 

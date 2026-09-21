@@ -43,8 +43,8 @@ pub struct TrainingExample {
 /// Produced by [`PlasticityTrainer::run_session`]'s preflight pass *before* any
 /// network, modulator, eligibility, or metric state mutates. Single-step APIs
 /// (`train_step`, `train_step_with_modulators`, and `train_step_from_critic`) do
-/// not run this check — they stay compatible with their existing `StepError`
-/// contracts, including NaN-reward skipping in `train_step`.
+/// not run this structural check; scalar step APIs independently reject
+/// non-finite rewards before invoking the network.
 ///
 /// `TrainingExample` has no sample IDs, so ordering is the batch slice order
 /// (index `0` is the first example). `TrainingConfig` currently has no invalid
@@ -58,10 +58,6 @@ pub enum SampleInvariant {
     /// A stimulus component was NaN or ±infinity.
     #[error("non-finite stimulus at channel {channel}")]
     NonFiniteStimulus { channel: usize },
-    /// Reward was ±infinity (NaN remains allowed: `train_step` skips modulation
-    /// and `run_session` omits it from `avg_reward`).
-    #[error("infinite reward")]
-    InfiniteReward,
 }
 
 /// Errors from batch training sessions.
@@ -70,6 +66,13 @@ pub enum TrainerError {
     /// Underlying network step failed.
     #[error("network step failed: {0:?}")]
     Step(StepError),
+    /// A scalar reward was NaN or positive/negative infinity.
+    ///
+    /// Direct step calls report `index: None`; batch APIs report the rejected
+    /// sample's zero-based index. Rejection happens before network or RNG state
+    /// changes, even when reward modulation is disabled.
+    #[error("non-finite reward{suffix}", suffix = reward_index_suffix(.index))]
+    NonFiniteReward { index: Option<usize> },
     /// `run_session` was called with an empty batch.
     ///
     /// Empty is a batch-level condition (no sample index). The network, trainer
@@ -105,6 +108,13 @@ pub enum TrainerError {
     },
 }
 
+#[cfg_attr(test, inline(never))]
+fn reward_index_suffix(index: &Option<usize>) -> String {
+    index
+        .map(|index| format!(" at sample {index}"))
+        .unwrap_or_default()
+}
+
 /// Reward-modulated training loop over a [`SpikingNetwork`].
 ///
 /// Applies scalar rewards to neuromodulators and steps the network. Domain-specific
@@ -128,20 +138,24 @@ impl PlasticityTrainer {
     /// When [`TrainingConfig::use_reward_modulation`] is `true` (default) and `reward`
     /// is finite, positive values increase dopamine and decrease norepinephrine;
     /// negative values do the opposite emphasis. Modulator values are clamped to
-    /// `[0.0, 1.0]`. Non-finite rewards (`NaN` and ±infinity) leave modulators
-    /// unchanged so invalid environment data cannot poison plasticity updates.
-    /// When the flag is `false`, the network steps with its current modulators
-    /// unchanged regardless of `reward`.
+    /// `[0.0, 1.0]`. The exact deltas come from
+    /// [`TrainingConfig::reward_mapping`]. Non-finite rewards (`NaN` and
+    /// ±infinity) return [`TrainerError::NonFiniteReward`] before network or RNG
+    /// state changes, even when reward modulation is disabled.
     ///
-    /// Returns indices of neurons that spiked, or a [`StepError`] from neuromod.
+    /// Returns indices of neurons that spiked, or a [`TrainerError`].
+    #[cfg_attr(test, inline(never))]
     pub fn train_step(
         &mut self,
         network: &mut SpikingNetwork,
         stimuli: &[f32],
         reward: f32,
-    ) -> Result<Vec<usize>, StepError> {
+    ) -> Result<Vec<usize>, TrainerError> {
+        require_finite_reward(reward, None)?;
         let modulators = self.modulators_for_reward(network, reward);
-        network.step(stimuli, &modulators)
+        network
+            .step(stimuli, &modulators)
+            .map_err(TrainerError::Step)
     }
 
     /// Same as [`Self::train_step`], but drives neuromod's stochastic input
@@ -168,15 +182,19 @@ impl PlasticityTrainer {
     ///     .unwrap();
     /// assert!(spikes.iter().all(|&i| i < 4));
     /// ```
+    #[cfg_attr(test, inline(never))]
     pub fn train_step_with_rng<R: Rng + ?Sized>(
         &mut self,
         network: &mut SpikingNetwork,
         stimuli: &[f32],
         reward: f32,
         rng: &mut R,
-    ) -> Result<Vec<usize>, StepError> {
+    ) -> Result<Vec<usize>, TrainerError> {
+        require_finite_reward(reward, None)?;
         let modulators = self.modulators_for_reward(network, reward);
-        network.step_with_rng(stimuli, &modulators, rng)
+        network
+            .step_with_rng(stimuli, &modulators, rng)
+            .map_err(TrainerError::Step)
     }
 
     /// Steps the network with explicit neuromodulators (e.g. from the limbic bridge).
@@ -185,24 +203,30 @@ impl PlasticityTrainer {
     /// should convert via `crate::to_neuromodulators` (`critic` feature; a
     /// plain code span, not a doc link — that item doesn't exist without the
     /// feature) and pass the result here.
+    #[cfg_attr(test, inline(never))]
     pub fn train_step_with_modulators(
         &mut self,
         network: &mut SpikingNetwork,
         stimuli: &[f32],
         modulators: &NeuroModulators,
-    ) -> Result<Vec<usize>, StepError> {
-        network.step(stimuli, modulators)
+    ) -> Result<Vec<usize>, TrainerError> {
+        network
+            .step(stimuli, modulators)
+            .map_err(TrainerError::Step)
     }
 
     /// Same as [`Self::train_step_with_modulators`], with a caller-supplied RNG.
+    #[cfg_attr(test, inline(never))]
     pub fn train_step_with_modulators_and_rng<R: Rng + ?Sized>(
         &mut self,
         network: &mut SpikingNetwork,
         stimuli: &[f32],
         modulators: &NeuroModulators,
         rng: &mut R,
-    ) -> Result<Vec<usize>, StepError> {
-        network.step_with_rng(stimuli, modulators, rng)
+    ) -> Result<Vec<usize>, TrainerError> {
+        network
+            .step_with_rng(stimuli, modulators, rng)
+            .map_err(TrainerError::Step)
     }
 
     /// Steps the network with a critic [`limbic_critic::ModulatorVector`].
@@ -210,12 +234,13 @@ impl PlasticityTrainer {
     /// Converts via [`crate::bridge::to_neuromodulators`] then steps. Available only
     /// with the `critic` feature.
     #[cfg(feature = "critic")]
+    #[cfg_attr(test, inline(never))]
     pub fn train_step_from_critic(
         &mut self,
         network: &mut SpikingNetwork,
         stimuli: &[f32],
         vector: &limbic_critic::ModulatorVector,
-    ) -> Result<Vec<usize>, StepError> {
+    ) -> Result<Vec<usize>, TrainerError> {
         self.train_step_with_modulators(
             network,
             stimuli,
@@ -226,7 +251,7 @@ impl PlasticityTrainer {
     /// Replays a batch of generic training examples and returns aggregated metrics.
     ///
     /// Admission is atomic: every example is validated (dimensions, finite
-    /// stimuli, infinite-reward) *before* the first `train_step`. A malformed
+    /// stimuli, finite reward) *before* the first `train_step`. A malformed
     /// sample at index `N` therefore cannot leave samples `0..N` applied.
     /// Examples are then processed in slice order, matching the historical
     /// sequential contract.
@@ -238,11 +263,13 @@ impl PlasticityTrainer {
     /// # Errors
     ///
     /// - [`TrainerError::EmptyBatch`] if `data` is empty (no sample index).
+    /// - [`TrainerError::NonFiniteReward`] if a reward is NaN or infinite.
     /// - [`TrainerError::InvalidSample`] if any example fails preflight; the
     ///   error names the first failing index and invariant. Network and trainer
     ///   state are unchanged.
     /// - [`TrainerError::Step`] if a network step fails after admission (for
     ///   example a `StepError` that cannot be seen from the example alone).
+    #[cfg_attr(test, inline(never))]
     pub fn run_session(
         &mut self,
         network: &mut SpikingNetwork,
@@ -253,9 +280,7 @@ impl PlasticityTrainer {
         let mut valid_reward_count = 0;
 
         for example in data {
-            let spikes = self
-                .train_step(network, &example.stimuli, example.reward)
-                .map_err(TrainerError::Step)?;
+            let spikes = self.train_step(network, &example.stimuli, example.reward)?;
             Self::accumulate_step(
                 &mut session.summary,
                 &mut total_reward,
@@ -287,7 +312,11 @@ impl PlasticityTrainer {
     /// # Errors
     ///
     /// - [`TrainerError::EmptyBatch`] if `data` is empty.
+    /// - [`TrainerError::NonFiniteReward`] if a reward is NaN or infinite.
+    /// - [`TrainerError::InvalidSample`] if any stimulus has the wrong length
+    ///   or contains a non-finite value.
     /// - [`TrainerError::Step`] if any network step fails.
+    #[cfg_attr(test, inline(never))]
     pub fn run_session_with_rng<R: Rng + ?Sized>(
         &mut self,
         network: &mut SpikingNetwork,
@@ -299,9 +328,8 @@ impl PlasticityTrainer {
         let mut valid_reward_count = 0;
 
         for example in data {
-            let spikes = self
-                .train_step_with_rng(network, &example.stimuli, example.reward, rng)
-                .map_err(TrainerError::Step)?;
+            let spikes =
+                self.train_step_with_rng(network, &example.stimuli, example.reward, rng)?;
             Self::accumulate_step(
                 &mut session.summary,
                 &mut total_reward,
@@ -322,25 +350,27 @@ impl PlasticityTrainer {
     }
 
     /// Computes the modulator vector `train_step` would pass into `network.step`.
+    #[cfg_attr(test, inline(never))]
     fn modulators_for_reward(&self, network: &SpikingNetwork, reward: f32) -> NeuroModulators {
         let mut modulators: NeuroModulators = network.modulators;
 
-        // Skip modulation on non-finite rewards: f32::clamp returns NaN
-        // unchanged rather than panicking, and ±infinity slams the clamped
-        // result to the 0/1 bounds. Either would silently corrupt subsequent
-        // STDP / homeostasis updates.
-        if self.config.use_reward_modulation && reward.is_finite() {
+        if self.config.use_reward_modulation {
+            let mapping = self.config.reward_mapping;
             // Positive reward shifts toward dopamine; negative toward norepinephrine
             // (stress/arousal). neuromod replaced the former cortisol field with
             // norepinephrine (see neuromod::NeuroModulators).
             if reward > 0.0 {
-                modulators.dopamine = (modulators.dopamine + reward * 0.1).clamp(0.0, 1.0);
-                modulators.norepinephrine =
-                    (modulators.norepinephrine - reward * 0.05).clamp(0.0, 1.0);
+                modulators.dopamine =
+                    (modulators.dopamine + reward * mapping.dopamine_gain()).clamp(0.0, 1.0);
+                modulators.norepinephrine = (modulators.norepinephrine
+                    - reward * mapping.positive_norepinephrine_suppression())
+                .clamp(0.0, 1.0);
             } else {
-                modulators.norepinephrine =
-                    (modulators.norepinephrine - reward * 0.2).clamp(0.0, 1.0);
-                modulators.dopamine = (modulators.dopamine + reward * 0.1).clamp(0.0, 1.0);
+                modulators.norepinephrine = (modulators.norepinephrine
+                    - reward * mapping.negative_norepinephrine_gain())
+                .clamp(0.0, 1.0);
+                modulators.dopamine =
+                    (modulators.dopamine + reward * mapping.dopamine_gain()).clamp(0.0, 1.0);
             }
         }
 
@@ -417,9 +447,12 @@ impl PlasticityTrainer {
     /// # Errors
     ///
     /// - [`TrainerError::EmptyBatch`] if `data` is empty (observer is not called).
+    /// - [`TrainerError::NonFiniteReward`] or [`TrainerError::InvalidSample`] if
+    ///   preflight rejects any example (observer is not called).
     /// - [`TrainerError::Step`] if a network step fails (observer is not called
     ///   for that failed step; earlier steps have already been observed).
     /// - [`TrainerError::Observer`] if `observer` returns an error.
+    #[cfg_attr(test, inline(never))]
     pub fn run_session_with_observer<O: TrainingObserver>(
         &mut self,
         network: &mut SpikingNetwork,
@@ -431,9 +464,7 @@ impl PlasticityTrainer {
         let mut valid_reward_count = 0;
 
         for (step_index, example) in data.iter().enumerate() {
-            let spikes = self
-                .train_step(network, &example.stimuli, example.reward)
-                .map_err(TrainerError::Step)?;
+            let spikes = self.train_step(network, &example.stimuli, example.reward)?;
             accumulate_reward(example, &mut total_reward, &mut valid_reward_count);
             session.summary.steps_processed += 1;
             record_step_spikes(&mut session.summary, &spikes);
@@ -575,6 +606,7 @@ fn admit_batch(network: &SpikingNetwork, data: &[TrainingExample]) -> Result<(),
     }
 
     for (index, example) in data.iter().enumerate() {
+        require_finite_reward(example.reward, Some(index))?;
         if let Some(reason) = sample_invariant(network, example) {
             return Err(TrainerError::InvalidSample { index, reason });
         }
@@ -596,10 +628,16 @@ fn sample_invariant(
     if let Some(channel) = example.stimuli.iter().position(|x| !x.is_finite()) {
         return Some(SampleInvariant::NonFiniteStimulus { channel });
     }
-    if example.reward.is_infinite() {
-        return Some(SampleInvariant::InfiniteReward);
-    }
     None
+}
+
+#[cfg_attr(test, inline(never))]
+fn require_finite_reward(reward: f32, index: Option<usize>) -> Result<(), TrainerError> {
+    if reward.is_finite() {
+        Ok(())
+    } else {
+        Err(TrainerError::NonFiniteReward { index })
+    }
 }
 
 /// Deprecated alias for [`PlasticityTrainer`], also reachable via the full module path.
@@ -616,9 +654,9 @@ pub use self::PlasticityTrainer as SpikenautTrainer;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::TrainingConfig;
+    use crate::config::{RewardMapping, TrainingConfig};
     use crate::observer::{TrainingObserver, TrainingStepEvent};
-    use rand::{SeedableRng, rngs::StdRng};
+    use rand::{RngExt as _, SeedableRng, rngs::StdRng};
 
     fn small_network() -> SpikingNetwork {
         SpikingNetwork::with_dimensions(4, 2, 8)
@@ -701,6 +739,7 @@ mod tests {
     fn train_step_without_reward_modulation_succeeds() {
         let config = TrainingConfig {
             use_reward_modulation: false,
+            ..TrainingConfig::default()
         };
         let mut trainer = PlasticityTrainer::new(config);
         let mut network = small_network();
@@ -711,37 +750,68 @@ mod tests {
     }
 
     #[test]
-    fn train_step_skips_nan_reward_modulation() {
-        let mut network = small_network();
-        network.modulators.dopamine = 0.4;
-        network.modulators.norepinephrine = 0.4;
-        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
-        trainer
-            .train_step(&mut network, &[0.2; 8], f32::NAN)
-            .expect("nan reward must not panic");
-        assert!((network.modulators.dopamine - 0.4).abs() < 1e-5);
-        assert!((network.modulators.norepinephrine - 0.4).abs() < 1e-5);
+    fn train_step_rejects_every_non_finite_reward_before_mutation() {
+        for reward in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut network = small_network();
+            seed_nonzero_network_state(&mut network);
+            let before = network_snapshot(&network);
+            let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+
+            let err = trainer
+                .train_step(&mut network, &[0.2; 8], reward)
+                .expect_err("non-finite reward");
+
+            assert_eq!(err, TrainerError::NonFiniteReward { index: None });
+            assert_eq!(network_snapshot(&network), before);
+        }
     }
 
     #[test]
-    fn train_step_skips_infinite_reward_modulation() {
-        let mut network = small_network();
-        network.modulators.dopamine = 0.4;
-        network.modulators.norepinephrine = 0.4;
-        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
-        trainer
-            .train_step(&mut network, &[0.2; 8], f32::INFINITY)
-            .expect("infinite reward must not panic");
-        assert!((network.modulators.dopamine - 0.4).abs() < 1e-5);
-        assert!((network.modulators.norepinephrine - 0.4).abs() < 1e-5);
+    fn non_finite_reward_display_names_batch_index_when_available() {
+        assert_eq!(
+            TrainerError::NonFiniteReward { index: None }.to_string(),
+            "non-finite reward"
+        );
+        assert_eq!(
+            TrainerError::NonFiniteReward { index: Some(7) }.to_string(),
+            "non-finite reward at sample 7"
+        );
+    }
 
-        trainer
-            .train_step(&mut network, &[0.2; 8], f32::NEG_INFINITY)
-            .expect("negative infinity must not panic");
-        assert!((network.modulators.dopamine - 0.4).abs() < 1e-5);
-        assert!((network.modulators.norepinephrine - 0.4).abs() < 1e-5);
-        assert!(network.modulators.dopamine.is_finite());
-        assert!(network.modulators.norepinephrine.is_finite());
+    #[test]
+    fn seeded_train_step_rejects_non_finite_reward_before_advancing_rng() {
+        let mut network = small_network();
+        seed_nonzero_network_state(&mut network);
+        let before = network_snapshot(&network);
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut rng = StdRng::seed_from_u64(42);
+        let mut untouched_rng = StdRng::seed_from_u64(42);
+
+        let err = trainer
+            .train_step_with_rng(&mut network, &[0.2; 8], f32::NAN, &mut rng)
+            .expect_err("non-finite reward");
+
+        assert_eq!(err, TrainerError::NonFiniteReward { index: None });
+        assert_eq!(network_snapshot(&network), before);
+        assert_eq!(rng.random::<u64>(), untouched_rng.random::<u64>());
+    }
+
+    #[test]
+    fn reward_modulation_disabled_still_rejects_non_finite_reward() {
+        let config = TrainingConfig {
+            use_reward_modulation: false,
+            ..TrainingConfig::default()
+        };
+        let mut trainer = PlasticityTrainer::new(config);
+        let mut network = small_network();
+        let before = network_snapshot(&network);
+
+        let err = trainer
+            .train_step(&mut network, &[0.2; 8], f32::INFINITY)
+            .expect_err("invalid environment input is independent of modulation policy");
+
+        assert_eq!(err, TrainerError::NonFiniteReward { index: None });
+        assert_eq!(network_snapshot(&network), before);
     }
 
     #[test]
@@ -774,6 +844,35 @@ mod tests {
         // norepinephrine -= reward * 0.2 → 0.5 - (-0.2) = 0.7
         assert!((network.modulators.dopamine - 0.4).abs() < 1e-5);
         assert!((network.modulators.norepinephrine - 0.7).abs() < 1e-5);
+    }
+
+    #[test]
+    fn custom_reward_mapping_controls_each_scalar_modulator_delta() {
+        let mapping = RewardMapping::builder()
+            .dopamine_gain(0.3)
+            .positive_norepinephrine_suppression(0.4)
+            .negative_norepinephrine_gain(0.5)
+            .build()
+            .expect("valid mapping");
+        let config = TrainingConfig::default().with_reward_mapping(mapping);
+
+        let mut positive_network = small_network();
+        positive_network.modulators.dopamine = 0.5;
+        positive_network.modulators.norepinephrine = 0.5;
+        PlasticityTrainer::new(config)
+            .train_step(&mut positive_network, &[0.005; 8], 0.5)
+            .expect("positive reward");
+        assert!((positive_network.modulators.dopamine - 0.65).abs() < 1e-5);
+        assert!((positive_network.modulators.norepinephrine - 0.3).abs() < 1e-5);
+
+        let mut negative_network = small_network();
+        negative_network.modulators.dopamine = 0.5;
+        negative_network.modulators.norepinephrine = 0.5;
+        PlasticityTrainer::new(config)
+            .train_step(&mut negative_network, &[0.005; 8], -0.5)
+            .expect("negative reward");
+        assert!((negative_network.modulators.dopamine - 0.35).abs() < 1e-5);
+        assert!((negative_network.modulators.norepinephrine - 0.75).abs() < 1e-5);
     }
 
     #[test]
@@ -985,9 +1084,11 @@ mod tests {
     }
 
     #[test]
-    fn run_session_avg_reward_ignores_nan_but_counts_the_step() {
+    fn run_session_rejects_nan_in_late_sample_atomically() {
         let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
+        seed_nonzero_network_state(&mut network);
+        let before = network_snapshot(&network);
         let batch = vec![
             TrainingExample {
                 stimuli: vec![0.005; 8],
@@ -1002,44 +1103,38 @@ mod tests {
                 reward: 0.2,
             },
         ];
-        let summary = trainer.run_session(&mut network, &batch).expect("session");
+        let err = trainer
+            .run_session(&mut network, &batch)
+            .expect_err("late non-finite reward");
 
-        assert_eq!(summary.steps_processed, 3);
-        assert!((summary.avg_reward - 0.3).abs() < 1e-5);
-        assert!(summary.avg_reward.is_finite());
-        assert!(
-            summary
-                .threshold_drifts
-                .iter()
-                .all(|value| value.is_finite())
-        );
-        assert!(
-            summary
-                .weight_drifts
-                .iter()
-                .flatten()
-                .all(|value| value.is_finite())
-        );
+        assert_eq!(err, TrainerError::NonFiniteReward { index: Some(1) });
+        assert_eq!(network_snapshot(&network), before);
     }
 
     #[test]
-    fn run_session_avg_reward_defaults_to_zero_when_all_rewards_nan() {
+    fn observer_session_rejects_non_finite_reward_before_any_callback() {
         let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
+        seed_nonzero_network_state(&mut network);
+        let before = network_snapshot(&network);
         let batch = vec![
             TrainingExample {
                 stimuli: vec![0.005; 8],
-                reward: f32::NAN,
+                reward: 0.2,
             },
             TrainingExample {
                 stimuli: vec![0.005; 8],
                 reward: f32::NAN,
             },
         ];
-        let summary = trainer.run_session(&mut network, &batch).expect("session");
+        let mut observer = RecordingObserver::default();
+        let err = trainer
+            .run_session_with_observer(&mut network, &batch, &mut observer)
+            .expect_err("observer session preflight");
 
-        assert_eq!(summary.steps_processed, 2);
-        assert_eq!(summary.avg_reward, 0.0);
+        assert_eq!(err, TrainerError::NonFiniteReward { index: Some(1) });
+        assert!(observer.step_indices.is_empty());
+        assert_eq!(network_snapshot(&network), before);
     }
 
     #[derive(Default)]
@@ -1412,18 +1507,78 @@ mod tests {
     }
 
     #[test]
-    fn train_step_still_returns_step_error_on_length_mismatch() {
+    fn train_step_wraps_step_error_on_length_mismatch() {
         let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         let err = trainer
             .train_step(&mut network, &[0.2; 3], 0.1)
-            .expect_err("single-step API stays StepError, not batch preflight");
+            .expect_err("single-step error is wrapped consistently");
         assert!(matches!(
             err,
-            StepError::InputLenMismatch {
+            TrainerError::Step(StepError::InputLenMismatch {
                 expected: 8,
                 got: 3
-            }
+            })
+        ));
+    }
+
+    #[test]
+    fn explicit_modulator_step_wraps_step_error_on_length_mismatch() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let err = trainer
+            .train_step_with_modulators(&mut network, &[0.2; 3], &NeuroModulators::default())
+            .expect_err("explicit-modulator error is wrapped consistently");
+
+        assert!(matches!(
+            err,
+            TrainerError::Step(StepError::InputLenMismatch {
+                expected: 8,
+                got: 3
+            })
+        ));
+    }
+
+    #[test]
+    fn seeded_explicit_modulator_step_wraps_step_error_on_length_mismatch() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let mut rng = StdRng::seed_from_u64(3);
+        let err = trainer
+            .train_step_with_modulators_and_rng(
+                &mut network,
+                &[0.2; 3],
+                &NeuroModulators::default(),
+                &mut rng,
+            )
+            .expect_err("seeded explicit-modulator error is wrapped consistently");
+
+        assert!(matches!(
+            err,
+            TrainerError::Step(StepError::InputLenMismatch {
+                expected: 8,
+                got: 3
+            })
+        ));
+    }
+
+    #[cfg(feature = "critic")]
+    #[test]
+    fn critic_step_wraps_step_error_on_length_mismatch() {
+        use limbic_critic::ModulatorVector;
+
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let err = trainer
+            .train_step_from_critic(&mut network, &[0.2; 3], &ModulatorVector::default())
+            .expect_err("critic error is wrapped consistently");
+
+        assert!(matches!(
+            err,
+            TrainerError::Step(StepError::InputLenMismatch {
+                expected: 8,
+                got: 3
+            })
         ));
     }
 
@@ -1528,30 +1683,45 @@ mod tests {
     }
 
     #[test]
-    fn batch_preflight_rejects_infinite_reward() {
+    fn batch_preflight_rejects_every_non_finite_reward_with_index() {
+        for reward in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+            let mut network = small_network();
+            seed_nonzero_network_state(&mut network);
+            let before = network_snapshot(&network);
+
+            let batch = vec![
+                valid_example(),
+                TrainingExample {
+                    stimuli: vec![0.2; 8],
+                    reward,
+                },
+            ];
+            let err = trainer
+                .run_session(&mut network, &batch)
+                .expect_err("non-finite reward");
+            assert_eq!(err, TrainerError::NonFiniteReward { index: Some(1) });
+            assert_eq!(network_snapshot(&network), before);
+        }
+    }
+
+    #[test]
+    fn seeded_batch_rejects_non_finite_reward_before_advancing_rng() {
         let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
         let mut network = small_network();
         seed_nonzero_network_state(&mut network);
         let before = network_snapshot(&network);
+        let batch = vec![valid_example(), example(8, 0.2, f32::NEG_INFINITY)];
+        let mut rng = StdRng::seed_from_u64(91);
+        let mut untouched_rng = StdRng::seed_from_u64(91);
 
-        let batch = vec![
-            valid_example(),
-            TrainingExample {
-                stimuli: vec![0.2; 8],
-                reward: f32::NEG_INFINITY,
-            },
-        ];
         let err = trainer
-            .run_session(&mut network, &batch)
-            .expect_err("infinite reward");
-        assert_eq!(
-            err,
-            TrainerError::InvalidSample {
-                index: 1,
-                reason: SampleInvariant::InfiniteReward,
-            }
-        );
+            .run_session_with_rng(&mut network, &batch, &mut rng)
+            .expect_err("preflight rejects before the first random draw");
+
+        assert_eq!(err, TrainerError::NonFiniteReward { index: Some(1) });
         assert_eq!(network_snapshot(&network), before);
+        assert_eq!(rng.random::<u64>(), untouched_rng.random::<u64>());
     }
 
     #[test]

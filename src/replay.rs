@@ -387,6 +387,7 @@ fn same_seed_replays_when_reward_modulation_is_disabled() {
         },
         TrainingConfig {
             use_reward_modulation: false,
+            ..TrainingConfig::default()
         },
         SEED_A,
     );

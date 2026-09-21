@@ -71,7 +71,7 @@ pub enum TrainerError {
     /// Direct step calls report `index: None`; batch APIs report the rejected
     /// sample's zero-based index. Rejection happens before network or RNG state
     /// changes, even when reward modulation is disabled.
-    #[error("non-finite reward")]
+    #[error("non-finite reward{suffix}", suffix = reward_index_suffix(.index))]
     NonFiniteReward { index: Option<usize> },
     /// `run_session` was called with an empty batch.
     ///
@@ -106,6 +106,12 @@ pub enum TrainerError {
         /// Which admission invariant failed.
         reason: SampleInvariant,
     },
+}
+
+fn reward_index_suffix(index: &Option<usize>) -> String {
+    index
+        .map(|index| format!(" at sample {index}"))
+        .unwrap_or_default()
 }
 
 /// Reward-modulated training loop over a [`SpikingNetwork`].
@@ -747,6 +753,18 @@ mod tests {
             assert_eq!(err, TrainerError::NonFiniteReward { index: None });
             assert_eq!(network_snapshot(&network), before);
         }
+    }
+
+    #[test]
+    fn non_finite_reward_display_names_batch_index_when_available() {
+        assert_eq!(
+            TrainerError::NonFiniteReward { index: None }.to_string(),
+            "non-finite reward"
+        );
+        assert_eq!(
+            TrainerError::NonFiniteReward { index: Some(7) }.to_string(),
+            "non-finite reward at sample 7"
+        );
     }
 
     #[test]
@@ -1500,6 +1518,29 @@ mod tests {
         let err = trainer
             .train_step_with_modulators(&mut network, &[0.2; 3], &NeuroModulators::default())
             .expect_err("explicit-modulator error is wrapped consistently");
+
+        assert!(matches!(
+            err,
+            TrainerError::Step(StepError::InputLenMismatch {
+                expected: 8,
+                got: 3
+            })
+        ));
+    }
+
+    #[test]
+    fn seeded_explicit_modulator_step_wraps_step_error_on_length_mismatch() {
+        let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+        let mut network = small_network();
+        let mut rng = StdRng::seed_from_u64(3);
+        let err = trainer
+            .train_step_with_modulators_and_rng(
+                &mut network,
+                &[0.2; 3],
+                &NeuroModulators::default(),
+                &mut rng,
+            )
+            .expect_err("seeded explicit-modulator error is wrapped consistently");
 
         assert!(matches!(
             err,

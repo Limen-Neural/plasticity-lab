@@ -131,19 +131,19 @@ fn validate_coefficient(name: &'static str, value: f32) -> Result<(), RewardMapp
 }
 
 #[derive(Deserialize)]
-#[serde(default)]
+#[serde(default, rename = "RewardMapping")]
 struct RewardMappingData {
-    dopamine_gain: f64,
-    positive_norepinephrine_suppression: f64,
-    negative_norepinephrine_gain: f64,
+    dopamine_gain: f32,
+    positive_norepinephrine_suppression: f32,
+    negative_norepinephrine_gain: f32,
 }
 
 impl Default for RewardMappingData {
     fn default() -> Self {
         Self {
-            dopamine_gain: DEFAULT_DOPAMINE_GAIN.into(),
-            positive_norepinephrine_suppression: DEFAULT_POSITIVE_NOREPINEPHRINE_SUPPRESSION.into(),
-            negative_norepinephrine_gain: DEFAULT_NEGATIVE_NOREPINEPHRINE_GAIN.into(),
+            dopamine_gain: DEFAULT_DOPAMINE_GAIN,
+            positive_norepinephrine_suppression: DEFAULT_POSITIVE_NOREPINEPHRINE_SUPPRESSION,
+            negative_norepinephrine_gain: DEFAULT_NEGATIVE_NOREPINEPHRINE_GAIN,
         }
     }
 }
@@ -154,37 +154,13 @@ impl<'de> Deserialize<'de> for RewardMapping {
         D: Deserializer<'de>,
     {
         let data = RewardMappingData::deserialize(deserializer)?;
-        deserialize_coefficient::<D::Error>("dopamine_gain", data.dopamine_gain)
-            .and_then(|dopamine_gain| {
-                deserialize_coefficient::<D::Error>(
-                    "positive_norepinephrine_suppression",
-                    data.positive_norepinephrine_suppression,
-                )
-                .map(|positive_norepinephrine_suppression| {
-                    (dopamine_gain, positive_norepinephrine_suppression)
-                })
-            })
-            .and_then(|(dopamine_gain, positive_norepinephrine_suppression)| {
-                deserialize_coefficient::<D::Error>(
-                    "negative_norepinephrine_gain",
-                    data.negative_norepinephrine_gain,
-                )
-                .map(|negative_norepinephrine_gain| RewardMappingBuilder {
-                    dopamine_gain,
-                    positive_norepinephrine_suppression,
-                    negative_norepinephrine_gain,
-                })
-            })
-            .and_then(|builder| builder.build().map_err(D::Error::custom))
-    }
-}
-
-fn deserialize_coefficient<E: serde::de::Error>(name: &'static str, value: f64) -> Result<f32, E> {
-    let value = value as f32;
-    if value.is_finite() {
-        Ok(value)
-    } else {
-        Err(E::custom(RewardMappingError::NonFiniteCoefficient { name }))
+        RewardMappingBuilder {
+            dopamine_gain: data.dopamine_gain,
+            positive_norepinephrine_suppression: data.positive_norepinephrine_suppression,
+            negative_norepinephrine_gain: data.negative_norepinephrine_gain,
+        }
+        .build()
+        .map_err(D::Error::custom)
     }
 }
 
@@ -235,6 +211,7 @@ impl Default for TrainingConfig {
 #[cfg(test)]
 mod tests {
     use super::{RewardMapping, RewardMappingError, TrainingConfig};
+    use serde_test::{Token, assert_tokens};
 
     #[test]
     fn default_enables_reward_modulation() {
@@ -267,6 +244,26 @@ mod tests {
         let round_tripped: TrainingConfig =
             serde_json::from_str(&json).expect("deserialize default config");
         assert_eq!(cfg, round_tripped);
+    }
+
+    #[test]
+    fn reward_mapping_serde_representation_uses_f32_coefficients_symmetrically() {
+        assert_tokens(
+            &RewardMapping::default(),
+            &[
+                Token::Struct {
+                    name: "RewardMapping",
+                    len: 3,
+                },
+                Token::Str("dopamine_gain"),
+                Token::F32(0.1),
+                Token::Str("positive_norepinephrine_suppression"),
+                Token::F32(0.05),
+                Token::Str("negative_norepinephrine_gain"),
+                Token::F32(0.2),
+                Token::StructEnd,
+            ],
+        );
     }
 
     #[test]

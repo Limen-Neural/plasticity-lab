@@ -99,10 +99,11 @@ in the registry.
 
 ## 6. Set the final date and publish
 
-Set `version = "0.3.0"` in `Cargo.toml`, regenerate `Cargo.lock`, and update the
-release-status wording in
-`README.md`, `CHANGELOG.md`, `CLAUDE.md`, and this guide from `Unpublished
-release candidate` to the planned publication date. Commit those changes and
+Set `version = "0.3.0"` in `Cargo.toml` and run `cargo update -w` to refresh only
+the workspace package entry in `Cargo.lock`, preserving the previously qualified
+transitive versions. Update the release-status wording in `README.md`,
+`CHANGELOG.md`, `CLAUDE.md`, and this guide from `Unpublished release candidate`
+to the planned publication date. Commit those changes and
 merge the final dated commit onto `main`. Rerun steps 2–5 from that `main`
 checkout, including the package and archive checks, then record the qualified
 commit immediately afterward:

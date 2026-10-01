@@ -54,6 +54,11 @@ Published to crates.io on 2026-09-19.
   JSON omission is covered by
   `old_and_partial_json_default_missing_reward_mapping_fields`.
 
+### Dependencies
+
+- Require registry `neuromod 0.7.0` for the frozen stepping APIs. The temporary
+  Git revision used during development has been removed.
+
 ### Changed (breaking)
 
 - `TrainingConfig` gained a public `reward_mapping: RewardMapping` field.

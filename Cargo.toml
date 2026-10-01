@@ -9,7 +9,7 @@ repository = "https://github.com/Limen-Neural/plasticity-lab"
 readme = "README.md"
 keywords = ["snn", "stdp", "plasticity", "neuromodulation", "reward-modulation"]
 categories = ["science", "simulation"]
-# Matches the minimum supported Rust version of neuromod 0.6.0.
+# Matches the minimum supported Rust version of neuromod 0.7.0.
 rust-version = "1.98.1"
 # Only consumer-facing source, examples, and licensing belong in the archive.
 include = [
@@ -39,10 +39,8 @@ thiserror = "2.0"
 # Same major as neuromod's `rand` so the traits line up.
 rand = "0.10"
 
-# Temporary exact development pin for frozen stepping from neuromod PR #162.
-# Replace this git source with registry `neuromod = "0.7.0"` before publishing
-# plasticity-lab 0.3.0; the version key is Cargo's publish fallback only.
-neuromod = { version = "0.6.0", git = "https://github.com/Limen-Neural/neuromod", rev = "da31dd5d92c2673d5ea01f7acc8b36abd3640f30" }
+# Registry 0.7.0 provides frozen stepping for held-out evaluation.
+neuromod = "0.7.0"
 limbic-critic = { version = "0.3.0", optional = true }
 
 [dev-dependencies]

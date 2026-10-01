@@ -63,11 +63,9 @@ One behavioral detail that isn't obvious from the public API alone:
 - This crate never encodes inputs or shapes rewards itself. `train_step`/`run_session` take precomputed `stimuli: &[f32]` and a scalar `reward: f32`; `train_step_with_modulators` and, under `critic`, `train_step_from_critic`/`apply_modulator_vector` take `stimuli: &[f32]` plus explicit `NeuroModulators`/`ModulatorVector` instead of a scalar reward. Encoding is `axon-encoder`'s job (not a dependency here — wire it in yourself), reward shaping is `limbic-critic`'s.
 - No domain-specific training logic (e.g. mining, trading) and no distillation/teacher-student transfer — that belongs to `SynapticDistill.jl` (Julia sister project, not a binding of this crate).
 - No `unsafe` code (enforced by Codacy static analysis).
-- Release dependencies must be registry-qualified. Frozen-evaluation
-  development temporarily pins the exact neuromod PR #162 merge commit because
-  neuromod 0.7.0 is not published yet; `deny.toml` allows only that repository.
-  Replace the pin and remove the source exception before qualifying or
-  publishing plasticity-lab 0.3.0. Do not use a mutable branch or path source.
+- Release dependencies must be registry-qualified. Frozen evaluation uses
+  published `neuromod 0.7.0`; `deny.toml` rejects Git dependencies. Do not use
+  a mutable branch or path source for the release candidate.
 
 ## Conventions
 

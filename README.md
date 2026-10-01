@@ -286,9 +286,8 @@ still be finite.
 ### Plasticity-frozen held-out evaluation (unreleased v0.3)
 
 This section describes the development API planned for `plasticity-lab 0.3.0`;
-it is not part of the published `plasticity-lab 0.2.1` package. The current
-implementation is pinned to the exact merged upstream frozen-stepping revision
-while registry packaging waits for `neuromod 0.7.0`. The installation guidance
+it is not part of the published `plasticity-lab 0.2.1` package. This development
+branch now uses published registry `neuromod 0.7.0`. The installation guidance
 above continues to describe the published 0.2.1 API.
 
 Evaluation is caller-owned: prepare a held-out slice of `EvaluationExample`

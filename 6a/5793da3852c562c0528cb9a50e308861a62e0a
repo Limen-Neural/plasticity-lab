@@ -1,0 +1,32 @@
+RELEASE.md
+  s_b1a8ac53eab429::t_289b742bd2a87a 17-18,21-22,88
+  s_b1a8ac53eab429::t_cd6375fb3835f4 128-129,134
+src/replay.rs
+  s_b1a8ac53eab429::t_289b742bd2a87a 39,42-43,81,177,313,326-329,334-344
+Cargo.toml
+  s_b1a8ac53eab429::t_289b742bd2a87a 12,42-43
+CLAUDE.md
+  s_b1a8ac53eab429::t_289b742bd2a87a 66-68
+README.md
+  s_b1a8ac53eab429::t_289b742bd2a87a 289-290
+deny.toml
+  s_b1a8ac53eab429::t_289b742bd2a87a 45
+CHANGELOG.md
+  s_b1a8ac53eab429::t_c381e3db99a548 57-60
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "6a5793da3852c562c0528cb9a50e308861a62e0a",
+  "prompts": {},
+  "sessions": {
+    "s_b1a8ac53eab429": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0b83c-e0a3-7a83-9109-e8784ba50bca",
+        "model": "gpt-6-sol"
+      },
+      "human_author": "Raul Cardenas Montoya <montoyaraul34@gmail.com>"
+    }
+  }
+}

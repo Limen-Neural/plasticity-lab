@@ -77,7 +77,7 @@ pub enum TrainerError {
     ///
     /// Empty is a batch-level condition (no sample index). The network, trainer
     /// config, and any caller-owned metrics are left untouched.
-    #[error("empty training batch")]
+    #[error("empty batch")]
     EmptyBatch,
     /// A per-step observer returned an error after a successful network step.
     ///
@@ -99,7 +99,7 @@ pub enum TrainerError {
     /// Preflight rejected the batch because sample `index` violated `reason`.
     ///
     /// No earlier sample has been applied; trainer and network state are unchanged.
-    #[error("invalid training sample {index}: {reason}")]
+    #[error("invalid sample {index}: {reason}")]
     InvalidSample {
         /// Zero-based index into the batch slice.
         index: usize,
@@ -614,7 +614,7 @@ fn admit_batch(network: &SpikingNetwork, data: &[TrainingExample]) -> Result<(),
     Ok(())
 }
 
-/// Returns the first violated admission invariant for `example`, if any.
+/// Returns the first violated admission invariant for `stimuli`, if any.
 pub(crate) fn stimulus_invariant(
     network: &SpikingNetwork,
     stimuli: &[f32],
@@ -1614,7 +1614,7 @@ mod tests {
         );
         assert_eq!(
             err.to_string(),
-            "invalid training sample 2: stimulus length mismatch: expected 8, got 3"
+            "invalid sample 2: stimulus length mismatch: expected 8, got 3"
         );
         assert_eq!(network.global_step, global_step_before);
         assert_eq!(eligibility_values(&network), eligibility_before);

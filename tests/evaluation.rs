@@ -74,6 +74,34 @@ fn active_network() -> SpikingNetwork {
     network
 }
 
+fn assert_seeded_batch_rejected_atomically(
+    mut network: SpikingNetwork,
+    held_out: &[EvaluationExample],
+    expected: TrainerError,
+    seed: u64,
+) {
+    let before_network = serde_json::to_string(&network).expect("network snapshot");
+    let mut rng = StdRng::seed_from_u64(seed);
+    let mut untouched_rng = StdRng::seed_from_u64(seed);
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+
+    let error = trainer
+        .run_eval_with_rng(
+            &mut network,
+            held_out,
+            &NeuroModulators::default(),
+            &mut rng,
+        )
+        .expect_err("held-out batch must be rejected");
+
+    assert_eq!(error, expected);
+    assert_eq!(
+        serde_json::to_string(&network).expect("network snapshot"),
+        before_network
+    );
+    assert_eq!(rng.random::<u64>(), untouched_rng.random::<u64>());
+}
+
 #[test]
 fn seeded_eval_step_advances_dynamics_and_preserves_plasticity_bitwise() {
     let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
@@ -188,9 +216,6 @@ fn unseeded_eval_batch_reports_held_out_spike_metrics() {
 
 #[test]
 fn eval_batch_rejects_a_late_non_finite_stimulus_before_network_or_rng_mutation() {
-    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
-    let mut network = active_network();
-    let before_network = serde_json::to_string(&network).expect("network snapshot");
     let held_out = vec![
         EvaluationExample {
             stimuli: vec![1.0, 0.8, 0.6],
@@ -199,30 +224,15 @@ fn eval_batch_rejects_a_late_non_finite_stimulus_before_network_or_rng_mutation(
             stimuli: vec![0.6, f32::NAN, 0.8],
         },
     ];
-    let mut rng = StdRng::seed_from_u64(77);
-    let mut untouched_rng = StdRng::seed_from_u64(77);
-
-    let error = trainer
-        .run_eval_with_rng(
-            &mut network,
-            &held_out,
-            &NeuroModulators::default(),
-            &mut rng,
-        )
-        .expect_err("late invalid held-out sample");
-
-    assert_eq!(
-        error,
+    assert_seeded_batch_rejected_atomically(
+        active_network(),
+        &held_out,
         TrainerError::InvalidSample {
             index: 1,
             reason: SampleInvariant::NonFiniteStimulus { channel: 1 },
-        }
+        },
+        77,
     );
-    assert_eq!(
-        serde_json::to_string(&network).expect("network snapshot"),
-        before_network
-    );
-    assert_eq!(rng.random::<u64>(), untouched_rng.random::<u64>());
 }
 
 #[test]
@@ -261,10 +271,8 @@ fn eval_batch_rejects_a_late_length_mismatch_atomically() {
 
 #[test]
 fn eval_batch_rejects_clock_exhaustion_before_network_or_rng_mutation() {
-    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
     let mut network = active_network();
     network.global_step = i64::MAX - 1;
-    let before_network = serde_json::to_string(&network).expect("network snapshot");
     let held_out = vec![
         EvaluationExample {
             stimuli: vec![1.0, 0.8, 0.6],
@@ -273,29 +281,14 @@ fn eval_batch_rejects_clock_exhaustion_before_network_or_rng_mutation() {
             stimuli: vec![0.6, 1.0, 0.8],
         },
     ];
-    let mut rng = StdRng::seed_from_u64(1297);
-    let mut untouched_rng = StdRng::seed_from_u64(1297);
-
-    let error = trainer
-        .run_eval_with_rng(
-            &mut network,
-            &held_out,
-            &NeuroModulators::default(),
-            &mut rng,
-        )
-        .expect_err("the complete held-out batch must fit in the network clock");
-
-    assert_eq!(
-        error,
+    assert_seeded_batch_rejected_atomically(
+        network,
+        &held_out,
         TrainerError::Step(StepError::StepCounterExhausted {
             global_step: i64::MAX - 1,
-        })
+        }),
+        1297,
     );
-    assert_eq!(
-        serde_json::to_string(&network).expect("network snapshot"),
-        before_network
-    );
-    assert_eq!(rng.random::<u64>(), untouched_rng.random::<u64>());
 }
 
 #[test]
@@ -312,6 +305,7 @@ fn eval_batches_reuse_the_existing_empty_batch_error() {
         trainer.run_eval(&mut unseeded_network, &[], &NeuroModulators::default()),
         Err(TrainerError::EmptyBatch)
     );
+    assert_eq!(TrainerError::EmptyBatch.to_string(), "empty batch");
     assert_eq!(
         trainer.run_eval_with_rng(
             &mut seeded_network,

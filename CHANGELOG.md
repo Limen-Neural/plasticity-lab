@@ -61,6 +61,10 @@ Published to crates.io on 2026-09-19.
 
 ### Changed (breaking)
 
+- `TrainerError::EmptyBatch` and `TrainerError::InvalidSample` now use
+  evaluation-neutral display text (`empty batch` / `invalid sample`) because
+  both training and held-out evaluation return these variants.
+
 - `TrainingConfig` gained a public `reward_mapping: RewardMapping` field.
   Downstream one-field struct literals such as
   `TrainingConfig { use_reward_modulation: false }` no longer compile; this

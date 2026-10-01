@@ -99,7 +99,8 @@ in the registry.
 
 ## 6. Set the final date and publish
 
-After every qualification step passes, update the release-status wording in
+Set `version = "0.3.0"` in `Cargo.toml`, regenerate `Cargo.lock`, and update the
+release-status wording in
 `README.md`, `CHANGELOG.md`, `CLAUDE.md`, and this guide from `Unpublished
 release candidate` to the planned publication date. Commit those changes and
 merge the final dated commit onto `main`. Rerun steps 2–5 from that `main`

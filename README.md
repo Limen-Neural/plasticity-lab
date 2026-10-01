@@ -301,21 +301,23 @@ use neuromod::{NeuroModulators, SpikingNetwork};
 use plasticity_lab::{EvaluationExample, PlasticityTrainer, TrainingConfig};
 use rand::{SeedableRng, rngs::StdRng};
 
-let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
-let mut network = SpikingNetwork::with_dimensions(4, 2, 3);
-for neuron in &mut network.neurons {
-    neuron.weights.fill(2.0 / network.num_channels as f32);
+fn main() {
+    let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
+    let mut network = SpikingNetwork::with_dimensions(4, 2, 3);
+    for neuron in &mut network.neurons {
+        neuron.weights.fill(2.0 / network.num_channels as f32);
+    }
+    let held_out = vec![
+        EvaluationExample { stimuli: vec![1.0, 0.8, 0.6] },
+        EvaluationExample { stimuli: vec![0.6, 1.0, 0.8] },
+    ];
+    let modulators = NeuroModulators::default();
+    let mut rng = StdRng::seed_from_u64(42);
+    let summary = trainer
+        .run_eval_with_rng(&mut network, &held_out, &modulators, &mut rng)
+        .unwrap();
+    assert_eq!(summary.steps_processed, held_out.len());
 }
-let held_out = vec![
-    EvaluationExample { stimuli: vec![1.0, 0.8, 0.6] },
-    EvaluationExample { stimuli: vec![0.6, 1.0, 0.8] },
-];
-let modulators = NeuroModulators::default();
-let mut rng = StdRng::seed_from_u64(42);
-let summary = trainer
-    .run_eval_with_rng(&mut network, &held_out, &modulators, &mut rng)
-    .unwrap();
-assert_eq!(summary.steps_processed, held_out.len());
 ```
 
 The full batch is admitted before its first step. Frozen evaluation advances
@@ -325,6 +327,11 @@ traces, thresholds, adaptive decay state, persistent modulators, and other
 plasticity-controlled state. `use_reward_modulation: false` is **not** an
 evaluation freeze: it disables scalar reward mapping but still runs normal
 plasticity-aware network stepping.
+
+Frozen evaluation also advances spike timestamps and the engine clock. A later
+normal training step can use those timestamps for STDP. To keep held-out data
+out of resumed training, evaluate on a separate caller-owned network initialized
+from the same trained state; this API does not create that copy.
 
 ### Reproducible (seeded) replay
 

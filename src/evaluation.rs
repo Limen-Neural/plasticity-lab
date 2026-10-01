@@ -30,16 +30,17 @@ impl PlasticityTrainer {
     ///
     /// The caller supplies the modulators used for runtime dynamics, but the
     /// network's persistent modulator state is restored before this method
-    /// returns. Evaluation accepts no scalar reward.
+    /// returns. Evaluation accepts no scalar reward. Runtime spike timestamps
+    /// still advance and can influence a later normal training step. Use a
+    /// separate caller-owned network for held-out evaluation if training will
+    /// resume from the original state.
     pub fn eval_step(
         &mut self,
         network: &mut SpikingNetwork,
         stimuli: &[f32],
         modulators: &NeuroModulators,
     ) -> Result<Vec<usize>, TrainerError> {
-        network
-            .step_frozen(stimuli, modulators)
-            .map_err(TrainerError::Step)
+        self.eval_step_with_rng(network, stimuli, modulators, &mut rand::rng())
     }
 
     /// Advances one held-out step without retaining plasticity changes, using
@@ -50,7 +51,9 @@ impl PlasticityTrainer {
     /// eligibility traces, thresholds, adaptive decay state, persistent
     /// modulators, and other plasticity-controlled state. This is stronger than
     /// setting [`crate::TrainingConfig::use_reward_modulation`] to `false`,
-    /// which still uses normal plasticity-aware stepping.
+    /// which still uses normal plasticity-aware stepping. Runtime timestamps
+    /// still advance; evaluate on a separate network if later training must
+    /// be unaffected by held-out stimuli.
     #[cfg_attr(test, inline(never))]
     pub fn eval_step_with_rng<R: Rng + ?Sized>(
         &mut self,
@@ -75,15 +78,7 @@ impl PlasticityTrainer {
         data: &[EvaluationExample],
         modulators: &NeuroModulators,
     ) -> Result<EvaluationSummary, TrainerError> {
-        admit_evaluation_batch(network, data)?;
-        let mut summary = new_evaluation_summary(network);
-
-        for example in data {
-            let spikes = self.eval_step(network, &example.stimuli, modulators)?;
-            record_evaluation_spikes(&mut summary, &spikes);
-        }
-
-        Ok(summary)
+        self.run_eval_with_rng(network, data, modulators, &mut rand::rng())
     }
 
     /// Evaluates a caller-owned held-out batch with one caller-owned RNG stream.

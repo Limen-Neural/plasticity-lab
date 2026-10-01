@@ -108,7 +108,8 @@ Single Rust crate; part of the Limen-Neural ecosystem.
   is now a production dependency because `train_step_with_rng` /
   `run_session_with_rng` take `&mut impl rand::Rng`. Do not re-add
   `axon-encoder` or `tracing` solely to make Cargo resolve a sibling crate.
-- Release dependencies use published registry requirements: `neuromod =
-  "0.6.0"` and optional `limbic-critic = "0.3.0"`. Do not replace them with
-  mutable git, path, or placeholder-version sources for a release candidate.
+- The published 0.2.1 release uses registry `neuromod = "0.6.0"`; the unreleased
+  v0.3 evaluation API requires registry `neuromod = "0.7.0"`. The optional
+  `limbic-critic = "0.3.0"` requirement is unchanged. Do not use mutable git,
+  path, or placeholder-version sources for a release candidate.
 - Do not add domain-specific or framework-heavy dependencies

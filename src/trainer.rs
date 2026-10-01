@@ -38,13 +38,13 @@ pub struct TrainingExample {
     pub reward: f32,
 }
 
-/// Batch-admission invariant violated by one [`TrainingExample`].
+/// Batch-admission invariant violated by one [`TrainingExample`] or
+/// [`crate::EvaluationExample`].
 ///
-/// Produced by [`PlasticityTrainer::run_session`]'s preflight pass *before* any
-/// network, modulator, eligibility, or metric state mutates. Single-step APIs
-/// (`train_step`, `train_step_with_modulators`, and `train_step_from_critic`) do
-/// not run this structural check; scalar step APIs independently reject
-/// non-finite rewards before invoking the network.
+/// Produced by training and evaluation preflight passes *before* any network,
+/// modulator, eligibility, RNG, or metric state mutates. Single-step APIs do
+/// not run this structural batch check; scalar training steps independently
+/// reject non-finite rewards before invoking the network.
 ///
 /// `TrainingExample` has no sample IDs, so ordering is the batch slice order
 /// (index `0` is the first example). `TrainingConfig` currently has no invalid
@@ -60,7 +60,7 @@ pub enum SampleInvariant {
     NonFiniteStimulus { channel: usize },
 }
 
-/// Errors from batch training sessions.
+/// Errors from training and held-out evaluation steps or sessions.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 pub enum TrainerError {
     /// Underlying network step failed.
@@ -73,11 +73,11 @@ pub enum TrainerError {
     /// changes, even when reward modulation is disabled.
     #[error("non-finite reward{suffix}", suffix = reward_index_suffix(.index))]
     NonFiniteReward { index: Option<usize> },
-    /// `run_session` was called with an empty batch.
+    /// `run_session` or `run_eval` was called with an empty batch.
     ///
     /// Empty is a batch-level condition (no sample index). The network, trainer
     /// config, and any caller-owned metrics are left untouched.
-    #[error("empty training batch")]
+    #[error("empty batch")]
     EmptyBatch,
     /// A per-step observer returned an error after a successful network step.
     ///
@@ -99,7 +99,7 @@ pub enum TrainerError {
     /// Preflight rejected the batch because sample `index` violated `reason`.
     ///
     /// No earlier sample has been applied; trainer and network state are unchanged.
-    #[error("invalid training sample {index}: {reason}")]
+    #[error("invalid sample {index}: {reason}")]
     InvalidSample {
         /// Zero-based index into the batch slice.
         index: usize,
@@ -607,25 +607,25 @@ fn admit_batch(network: &SpikingNetwork, data: &[TrainingExample]) -> Result<(),
 
     for (index, example) in data.iter().enumerate() {
         require_finite_reward(example.reward, Some(index))?;
-        if let Some(reason) = sample_invariant(network, example) {
+        if let Some(reason) = stimulus_invariant(network, &example.stimuli) {
             return Err(TrainerError::InvalidSample { index, reason });
         }
     }
     Ok(())
 }
 
-/// Returns the first violated admission invariant for `example`, if any.
-fn sample_invariant(
+/// Returns the first violated admission invariant for `stimuli`, if any.
+pub(crate) fn stimulus_invariant(
     network: &SpikingNetwork,
-    example: &TrainingExample,
+    stimuli: &[f32],
 ) -> Option<SampleInvariant> {
-    if example.stimuli.len() != network.num_channels {
+    if stimuli.len() != network.num_channels {
         return Some(SampleInvariant::StimulusLenMismatch {
             expected: network.num_channels,
-            got: example.stimuli.len(),
+            got: stimuli.len(),
         });
     }
-    if let Some(channel) = example.stimuli.iter().position(|x| !x.is_finite()) {
+    if let Some(channel) = stimuli.iter().position(|x| !x.is_finite()) {
         return Some(SampleInvariant::NonFiniteStimulus { channel });
     }
     None
@@ -1614,7 +1614,7 @@ mod tests {
         );
         assert_eq!(
             err.to_string(),
-            "invalid training sample 2: stimulus length mismatch: expected 8, got 3"
+            "invalid sample 2: stimulus length mismatch: expected 8, got 3"
         );
         assert_eq!(network.global_step, global_step_before);
         assert_eq!(eligibility_values(&network), eligibility_before);

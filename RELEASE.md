@@ -14,11 +14,12 @@ test -z "$(git status --porcelain)"
 
 ## 1. Confirm the release manifest
 
-The release candidate must use the published registry dependencies:
+The next release candidate must use published registry dependencies. For the
+unreleased v0.3 evaluation API, that means:
 
 ```toml
-plasticity-lab = "0.2.1"
-neuromod = "0.6.0"
+plasticity-lab = "0.3.0" # after the release version is set
+neuromod = "0.7.0"
 limbic-critic = "0.3.0" # optional, enabled by the `critic` feature
 ```
 
@@ -84,7 +85,7 @@ uses the extracted package and the candidate's registry sibling versions:
 ```toml
 [dependencies]
 plasticity-lab = { path = "../plasticity-lab-<version>" }
-neuromod = "0.6.0"
+neuromod = "0.7.0"
 ```
 
 Point the path at the directory extracted in step 4. Add a minimal program
@@ -98,9 +99,11 @@ in the registry.
 
 ## 6. Set the final date and publish
 
-After every qualification step passes, update the release-status wording in
-`README.md`, `CHANGELOG.md`, `CLAUDE.md`, and this guide from `Unpublished
-release candidate` to the planned publication date. Commit those changes and
+Set `version = "0.3.0"` in `Cargo.toml` and run `cargo update -w` to refresh only
+the workspace package entry in `Cargo.lock`, preserving the previously qualified
+transitive versions. Update the release-status wording in `README.md`,
+`CHANGELOG.md`, `CLAUDE.md`, and this guide from `Unpublished release candidate`
+to the planned publication date. Commit those changes and
 merge the final dated commit onto `main`. Rerun steps 2–5 from that `main`
 checkout, including the package and archive checks, then record the qualified
 commit immediately afterward:
@@ -124,12 +127,12 @@ Before publishing, return to the original clean checkout and verify that the
   test "$(git rev-parse HEAD)" = "$qualified_commit"
   test "$(git rev-parse origin/main)" = "$qualified_commit"
   cargo publish --locked --all-features
-  git tag -s v0.2.0 "$qualified_commit" -m "v0.2.0"
-  git push origin v0.2.0
+  git tag -s v0.3.0 "$qualified_commit" -m "v0.3.0"
+  git push origin v0.3.0
 )
 ```
 
 Finally, verify the crates.io page and the docs.rs build with all features,
-then repeat step 5 with `plasticity-lab = "0.2.0"` from crates.io. Create the
+then repeat step 5 with `plasticity-lab = "0.3.0"` from crates.io. Create the
 GitHub Release for the tag and follow the repository's configured Linear
 release workflow, if present.

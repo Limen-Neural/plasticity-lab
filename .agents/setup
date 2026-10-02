@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Limen-Neural contributors
+# SPDX-License-Identifier: MIT OR Apache-2.0
+set -euo pipefail
+
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+SECONDS=0
+
+echo 'Checking native build prerequisites'
+missing=()
+for package in build-essential curl ca-certificates; do
+    if [[ "$(dpkg-query -W -f='${Status}' "$package" 2>/dev/null)" != 'install ok installed' ]]; then
+        missing+=("$package")
+    fi
+done
+if ((${#missing[@]})); then
+    sudo -n apt-get update
+    sudo -n apt-get install -y --no-install-recommends "${missing[@]}"
+fi
+
+export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
+if ! command -v rustup >/dev/null 2>&1; then
+    echo 'Installing rustup (the repository selects the Rust version)'
+    installer="$(mktemp)"
+    trap 'rm -f -- "$installer"' EXIT
+    curl --proto '=https' --tlsv1.2 --fail --silent --show-error \
+        https://sh.rustup.rs -o "$installer"
+    sh "$installer" -y --no-modify-path --default-toolchain none
+fi
+
+# Amp and supervised services use new login shells, not this setup process.
+# rustup's env script avoids prepending Cargo's bin directory more than once.
+profile_line='. "${CARGO_HOME:-$HOME/.cargo}/env"'
+if ! grep -Fqx "$profile_line" "$HOME/.bash_profile" 2>/dev/null; then
+    printf '\n%s\n' "$profile_line" >> "$HOME/.bash_profile"
+fi
+
+echo 'Installing the toolchain and components from rust-toolchain.toml'
+time rustup toolchain install --no-self-update
+
+echo 'Fetching locked dependencies'
+time cargo fetch --locked
+
+echo 'Warming all-feature build and test caches'
+time cargo build --locked --all-features
+time cargo test --no-run --locked --all-features
+
+echo "Orb setup finished in ${SECONDS}s"

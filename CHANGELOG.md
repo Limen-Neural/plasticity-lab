@@ -33,6 +33,13 @@ Published to crates.io on 2026-09-19.
 
 ### Added
 
+- Synthetic delayed-reward association integration benchmark (LIM-1298): two
+  stimulus classes, paired reversed-reward and modulation-disabled controls,
+  disjoint caller-owned splits, and frozen spike-rate discrimination on five
+  predeclared seeds with a nonzero per-seed/aggregate pass margin. README records
+  the complete protocol and every result; evaluation preserves plasticity bits
+  and leaves the original training checkpoints/RNGs untouched.
+
 - `EvaluationExample`, `EvaluationSummary`, `eval_step*`, and `run_eval*`
   provide caller-owned held-out evaluation through neuromod's frozen stepping.
   Evaluation takes explicit modulators but no scalar reward, preflights the

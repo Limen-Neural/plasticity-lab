@@ -390,8 +390,10 @@ Evaluation state is discarded, never used to resume training.
 The success metric is **class-conditional spike-rate discrimination**, D: mean
 frozen-evaluation spikes per neuron per tick for A **minus** that rate for B
 (range −1 to 1). **Every seed and the arithmetic mean must have aligned D ≥ 0.05
-and aligned D − shuffled D ≥ 0.05.** `avg_reward` is not scored; training weight
-contrast is only a delayed-credit protocol diagnostic. The metric, seed sets,
+and aligned D − shuffled D ≥ 0.05.** The test also asserts **modulation-disabled
+D == 0** for every seed and the mean as a neutral-control symmetry check.
+`avg_reward` is not scored; training weight contrast is only a delayed-credit
+protocol diagnostic. The metric, seed sets,
 split rule, and margins were fixed before development; the first development
 protocol passed without tuning, and all parameters were recorded before final
 evaluation. The experiment record is preserved in

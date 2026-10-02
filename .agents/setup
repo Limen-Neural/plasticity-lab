@@ -6,6 +6,7 @@ set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 SECONDS=0
 
+# Amp orbs use Debian; this is not a cross-platform workstation installer.
 echo 'Checking native build prerequisites'
 missing=()
 for package in build-essential curl ca-certificates; do
@@ -14,8 +15,12 @@ for package in build-essential curl ca-certificates; do
     fi
 done
 if ((${#missing[@]})); then
-    sudo -n apt-get update
-    sudo -n apt-get install -y --no-install-recommends "${missing[@]}"
+    elevate=()
+    if [[ $(id -u) != 0 ]]; then
+        elevate=(sudo -n)
+    fi
+    "${elevate[@]}" apt-get update
+    "${elevate[@]}" apt-get install -y --no-install-recommends "${missing[@]}"
 fi
 
 export PATH="${CARGO_HOME:-$HOME/.cargo}/bin:$PATH"
@@ -30,9 +35,18 @@ fi
 
 # Amp and supervised services use new login shells, not this setup process.
 # rustup's env script avoids prepending Cargo's bin directory more than once.
+# Use the first existing Bash login profile instead of shadowing it with a new
+# higher-priority file. With no existing profile, create .profile.
+profile="$HOME/.profile"
+for candidate in .bash_profile .bash_login .profile; do
+    if [[ -f "$HOME/$candidate" ]]; then
+        profile="$HOME/$candidate"
+        break
+    fi
+done
 profile_line='. "${CARGO_HOME:-$HOME/.cargo}/env"'
-if ! grep -Fqx "$profile_line" "$HOME/.bash_profile" 2>/dev/null; then
-    printf '\n%s\n' "$profile_line" >> "$HOME/.bash_profile"
+if ! grep -Fqx "$profile_line" "$profile" 2>/dev/null; then
+    printf '\n%s\n' "$profile_line" >> "$profile"
 fi
 
 echo 'Installing the toolchain and components from rust-toolchain.toml'

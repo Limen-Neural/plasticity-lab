@@ -83,3 +83,17 @@ Environment: Linux x86_64, Rust 1.98.1, registry neuromod 0.7.0, rand 0.10.3,
 unchanged Cargo.lock. SmallRng results are version/target dependent. This is
 evidence for this synthetic assay, not general task accuracy or superiority
 to same-step reward. See the [README protocol](../../README.md#delayed-reward-association-benchmark-unreleased-v03).
+
+## Review clarifications (no protocol changes)
+
+The implemented test also requires **modulation-disabled D == 0**, for every
+seed and the mean, as a symmetry check on the neutral control. This assertion
+was already present in the first final run; its omission from the prose is
+clarified here rather than retroactively adding it to the predevelopment
+declaration. The two predeclared learning margins remain unchanged.
+
+Rand 0.10.3 selects the same Xoshiro256++ implementation of SmallRng on the
+current 64-bit Linux, macOS, and Windows CI targets, which all passed this
+protocol. Its 32-bit implementation differs; neither cross-width reproduction
+nor future rand-version stability is claimed. Retain the locked RNG protocol
+instead of replacing it after observing final results.

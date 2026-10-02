@@ -18,7 +18,8 @@
 //! Score D is class-conditional spike-rate discrimination: frozen spikes per
 //! neuron per tick for A minus B. Every seed AND the aggregate must have
 //! D_aligned >= 0.05 and D_aligned - D_shuffled >= 0.05. Training reward/weight
-//! diagnostics cannot pass this test. The metric, seeds, split, and margin were
+//! diagnostics cannot pass this test. The no-modulation control also checks
+//! D == 0 as a symmetry invariant. The metric, seeds, split, and margin were
 //! recorded before development; all parameters were locked before final scoring.
 //! See docs/benchmarks/delayed-association.md and README.
 
@@ -40,6 +41,12 @@ struct Trial {
     id: usize,
     class: usize,
     amplitude: f32,
+}
+
+enum Condition {
+    Aligned,
+    Shuffled,
+    ModulationDisabled,
 }
 
 fn trials(seed: u64, start: usize, count: usize, amplitude: f32) -> Vec<Trial> {
@@ -65,7 +72,7 @@ fn stimulus(trial: &Trial) -> Vec<f32> {
 }
 
 fn training_batch(trial: &Trial, shuffled: bool) -> Vec<TrainingExample> {
-    (0..PAIRING + DELAY + 1)
+    (0..=PAIRING + DELAY)
         .map(|tick| TrainingExample {
             stimuli: if tick < PAIRING {
                 stimulus(trial)
@@ -103,16 +110,16 @@ fn train_condition(
     checkpoint: &[u8],
     training: &[Trial],
     rng: &SmallRng,
-    shuffled: bool,
-    modulation: bool,
+    condition: Condition,
 ) -> (SpikingNetwork, SmallRng) {
     let mut network: SpikingNetwork = serde_json::from_slice(checkpoint).unwrap();
     assert_eq!(serde_json::to_vec(&network).unwrap(), checkpoint);
     let mut rng = rng.clone();
     let mut trainer = PlasticityTrainer::new(TrainingConfig {
-        use_reward_modulation: modulation,
+        use_reward_modulation: !matches!(condition, Condition::ModulationDisabled),
         reward_mapping: RewardMapping::builder().dopamine_gain(1.0).build().unwrap(),
     });
+    let shuffled = matches!(condition, Condition::Shuffled);
     for trial in training {
         // Episodic task: discard prior trial's traces and dopamine, retain weights
         // and thresholds. Never reset between pairing and delayed payout.
@@ -155,7 +162,7 @@ fn evaluate(trained: &SpikingNetwork, held_out: &[Trial], seed: u64) -> f64 {
     let before = plasticity_bits(trained);
     let mut rng = SmallRng::seed_from_u64(seed ^ 0xE7A1_0000);
     let mut trainer = PlasticityTrainer::new(TrainingConfig::default());
-    let mut classes = std::array::from_fn(|_| EvaluationSummary {
+    let mut classes: [EvaluationSummary; 2] = std::array::from_fn(|_| EvaluationSummary {
         per_neuron_spikes: vec![0; trained.neurons.len()],
         ..EvaluationSummary::default()
     });
@@ -207,9 +214,10 @@ fn paired_scores(seed: u64, split_start: usize) -> [f64; 3] {
     let training = trials(seed, 0, 4, 0.8);
     let held_out = trials(seed, split_start, 8, 0.15);
     let rng = SmallRng::seed_from_u64(seed);
-    let (aligned, aligned_rng) = train_condition(&initial, &training, &rng, false, true);
-    let (shuffled, shuffled_rng) = train_condition(&initial, &training, &rng, true, true);
-    let (disabled, disabled_rng) = train_condition(&initial, &training, &rng, false, false);
+    let (aligned, aligned_rng) = train_condition(&initial, &training, &rng, Condition::Aligned);
+    let (shuffled, shuffled_rng) = train_condition(&initial, &training, &rng, Condition::Shuffled);
+    let (disabled, disabled_rng) =
+        train_condition(&initial, &training, &rng, Condition::ModulationDisabled);
     assert_eq!(aligned_rng, shuffled_rng);
     assert_eq!(aligned_rng, disabled_rng);
     let before_rngs = [
@@ -267,8 +275,8 @@ fn association_development_replays_training_and_frozen_readout() {
     let initial = initial_checkpoint();
     let training = trials(1, 0, 4, 0.8);
     let rng = SmallRng::seed_from_u64(1);
-    let (first, first_rng) = train_condition(&initial, &training, &rng, false, true);
-    let (second, second_rng) = train_condition(&initial, &training, &rng, false, true);
+    let (first, first_rng) = train_condition(&initial, &training, &rng, Condition::Aligned);
+    let (second, second_rng) = train_condition(&initial, &training, &rng, Condition::Aligned);
     assert_eq!(
         serde_json::to_vec(&first).unwrap(),
         serde_json::to_vec(&second).unwrap()
@@ -331,51 +339,65 @@ fn association_banks_credit_until_the_silent_delayed_payout() {
     // Weight contrast is a protocol diagnostic, never the held-out score.
 }
 
+/// Check one episode's stimuli/delay/payout and return both conditions' payouts.
+fn assert_delayed_labels(trial: &Trial) -> [f32; 2] {
+    let aligned = training_batch(trial, false);
+    let shuffled = training_batch(trial, true);
+    assert_eq!(aligned.len(), PAIRING + DELAY + 1);
+    assert_eq!(aligned.len(), shuffled.len());
+    let expected_stimulus = if trial.class == 0 {
+        vec![trial.amplitude, trial.amplitude, 0.0, 0.0]
+    } else {
+        vec![0.0, 0.0, trial.amplitude, trial.amplitude]
+    };
+    let expected_payout = if trial.class == 0 {
+        (1.0, 0.0)
+    } else {
+        (0.0, 1.0)
+    };
+    for (tick, (a, s)) in aligned.iter().zip(&shuffled).enumerate() {
+        assert_eq!(a.stimuli, s.stimuli);
+        assert_eq!(a.stimuli.len(), 4);
+        if tick < PAIRING {
+            assert_eq!(a.stimuli, expected_stimulus);
+        } else {
+            assert_eq!(a.stimuli, vec![0.0; 4]);
+        }
+        if tick < PAIRING + DELAY {
+            assert_eq!((a.reward, s.reward), (0.0, 0.0));
+        } else {
+            assert_eq!((a.reward, s.reward), expected_payout);
+        }
+    }
+    [
+        aligned[PAIRING + DELAY].reward,
+        shuffled[PAIRING + DELAY].reward,
+    ]
+}
+
 #[test]
 fn association_protocol_pairs_inputs_and_permutes_only_delayed_labels() {
     let training = trials(1, 0, 4, 0.8);
     assert_eq!(training.len(), 4);
-    let mut rewards = [Vec::new(), Vec::new()];
     for pair in training.as_chunks::<2>().0 {
         assert_ne!(pair[0].class, pair[1].class);
         assert_eq!(pair[0].amplitude, pair[1].amplitude);
-        for trial in pair {
-            let aligned = training_batch(trial, false);
-            let shuffled = training_batch(trial, true);
-            assert_eq!(aligned.len(), PAIRING + DELAY + 1);
-            assert_eq!(aligned.len(), shuffled.len());
-            for (tick, (a, s)) in aligned.iter().zip(&shuffled).enumerate() {
-                assert_eq!(a.stimuli, s.stimuli);
-                assert_eq!(a.stimuli.len(), 4);
-                if tick < PAIRING {
-                    let expected = if trial.class == 0 {
-                        vec![trial.amplitude, trial.amplitude, 0.0, 0.0]
-                    } else {
-                        vec![0.0, 0.0, trial.amplitude, trial.amplitude]
-                    };
-                    assert_eq!(a.stimuli, expected);
-                } else {
-                    assert_eq!(a.stimuli, vec![0.0; 4]);
-                }
-                if tick < PAIRING + DELAY {
-                    assert_eq!((a.reward, s.reward), (0.0, 0.0));
-                } else {
-                    let expected = if trial.class == 0 {
-                        (1.0, 0.0)
-                    } else {
-                        (0.0, 1.0)
-                    };
-                    assert_eq!((a.reward, s.reward), expected);
-                    rewards[0].push(a.reward);
-                    rewards[1].push(s.reward);
-                }
-            }
-        }
+    }
+    let mut rewards = [Vec::new(), Vec::new()];
+    for trial in &training {
+        let [aligned, shuffled] = assert_delayed_labels(trial);
+        rewards[0].push(aligned);
+        rewards[1].push(shuffled);
     }
     for reward in &mut rewards {
         reward.sort_by(f32::total_cmp);
         assert_eq!(reward, &[0.0, 0.0, 1.0, 1.0]);
     }
+}
+
+#[test]
+fn association_split_is_disjoint_and_seeded() {
+    let training = trials(1, 0, 4, 0.8);
     assert_eq!(training, trials(1, 0, 4, 0.8));
     assert_ne!(training, trials(2, 0, 4, 0.8));
     let development = trials(1, 100, 8, 0.15);

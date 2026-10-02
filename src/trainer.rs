@@ -379,13 +379,14 @@ impl PlasticityTrainer {
 
     pub(crate) fn accumulate_step(
         summary: &mut TrainingSummary,
-        total_reward: &mut f32,
+        total_reward: &mut f64,
         valid_reward_count: &mut u32,
         example: &TrainingExample,
         spikes: &[usize],
     ) {
         if example.reward.is_finite() {
-            *total_reward += example.reward;
+            // Widen before summing: finite f32 rewards can overflow an f32 total.
+            *total_reward += f64::from(example.reward);
             *valid_reward_count += 1;
         }
         summary.steps_processed += 1;
@@ -403,11 +404,11 @@ impl PlasticityTrainer {
         network: &SpikingNetwork,
         initial_thresholds: &[f32],
         initial_weights: &[Vec<f32>],
-        total_reward: f32,
+        total_reward: f64,
         valid_reward_count: u32,
     ) -> TrainingSummary {
         summary.avg_reward = if valid_reward_count > 0 {
-            total_reward / valid_reward_count as f32
+            (total_reward / f64::from(valid_reward_count)) as f32
         } else {
             0.0
         };
@@ -523,11 +524,11 @@ fn start_session(
 
 fn accumulate_reward(
     example: &TrainingExample,
-    total_reward: &mut f32,
+    total_reward: &mut f64,
     valid_reward_count: &mut usize,
 ) {
     if example.reward.is_finite() {
-        *total_reward += example.reward;
+        *total_reward += f64::from(example.reward);
         *valid_reward_count += 1;
     }
 }
@@ -573,11 +574,11 @@ fn finish_summary(
     network: &SpikingNetwork,
     initial_thresholds: &[f32],
     initial_weights: &[Vec<f32>],
-    total_reward: f32,
+    total_reward: f64,
     valid_reward_count: usize,
 ) {
     summary.avg_reward = if valid_reward_count > 0 {
-        total_reward / valid_reward_count as f32
+        (total_reward / valid_reward_count as f64) as f32
     } else {
         0.0
     };
@@ -926,6 +927,62 @@ mod tests {
         assert_eq!(summary.steps_processed, 2);
         assert!((summary.avg_reward - 0.05).abs() < 1e-5);
         assert_eq!(summary.threshold_drifts.len(), network.neurons.len());
+    }
+
+    fn assert_session_reward_mean(rewards: &[f32], expected: f32) {
+        let batch: Vec<_> = rewards
+            .iter()
+            .map(|&reward| example(8, 0.0, reward))
+            .collect();
+
+        for use_reward_modulation in [false, true] {
+            let mut trainer = PlasticityTrainer::new(TrainingConfig {
+                use_reward_modulation,
+                ..TrainingConfig::default()
+            });
+            let mut rng = StdRng::seed_from_u64(42);
+            let mut observer = RecordingObserver::default();
+            let summaries = [
+                trainer.run_session(&mut small_network(), &batch).unwrap(),
+                trainer
+                    .run_session_with_rng(&mut small_network(), &batch, &mut rng)
+                    .unwrap(),
+                trainer
+                    .run_session_with_observer(&mut small_network(), &batch, &mut observer)
+                    .unwrap(),
+            ];
+
+            assert_eq!(
+                summaries.each_ref().map(|summary| summary.avg_reward),
+                [expected; 3],
+                "ordinary, seeded, observer means; use_reward_modulation={use_reward_modulation}"
+            );
+            for summary in summaries {
+                assert!(summary.avg_reward.is_finite());
+                assert_eq!(summary.steps_processed, rewards.len());
+            }
+            assert_eq!(observer.rewards, rewards);
+        }
+    }
+
+    #[test]
+    fn session_reward_mean_preserves_positive_max() {
+        assert_session_reward_mean(&[f32::MAX, f32::MAX], f32::MAX);
+    }
+
+    #[test]
+    fn session_reward_mean_preserves_negative_max() {
+        assert_session_reward_mean(&[-f32::MAX, -f32::MAX], -f32::MAX);
+    }
+
+    #[test]
+    fn session_reward_mean_cancels_extreme_rewards() {
+        assert_session_reward_mean(&[f32::MAX, f32::MAX, -f32::MAX, -f32::MAX], 0.0);
+    }
+
+    #[test]
+    fn session_reward_mean_preserves_mixed_sign_mean() {
+        assert_session_reward_mean(&[1.0, -0.5, 0.25], 0.25);
     }
 
     #[test]

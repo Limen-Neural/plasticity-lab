@@ -276,18 +276,11 @@ impl PlasticityTrainer {
         data: &[TrainingExample],
     ) -> Result<TrainingSummary, TrainerError> {
         let mut session = start_session(network, data)?;
-        let mut total_reward = 0.0;
-        let mut valid_reward_count = 0;
+        let mut reward_sum = ExactRewardSum::default();
 
         for example in data {
             let spikes = self.train_step(network, &example.stimuli, example.reward)?;
-            Self::accumulate_step(
-                &mut session.summary,
-                &mut total_reward,
-                &mut valid_reward_count,
-                example,
-                &spikes,
-            );
+            Self::accumulate_step(&mut session.summary, &mut reward_sum, example, &spikes);
         }
 
         Ok(Self::finalize_summary(
@@ -295,8 +288,7 @@ impl PlasticityTrainer {
             network,
             &session.initial_thresholds,
             &session.initial_weights,
-            total_reward,
-            valid_reward_count,
+            &reward_sum,
         ))
     }
 
@@ -324,19 +316,12 @@ impl PlasticityTrainer {
         rng: &mut R,
     ) -> Result<TrainingSummary, TrainerError> {
         let mut session = start_session(network, data)?;
-        let mut total_reward = 0.0;
-        let mut valid_reward_count = 0;
+        let mut reward_sum = ExactRewardSum::default();
 
         for example in data {
             let spikes =
                 self.train_step_with_rng(network, &example.stimuli, example.reward, rng)?;
-            Self::accumulate_step(
-                &mut session.summary,
-                &mut total_reward,
-                &mut valid_reward_count,
-                example,
-                &spikes,
-            );
+            Self::accumulate_step(&mut session.summary, &mut reward_sum, example, &spikes);
         }
 
         Ok(Self::finalize_summary(
@@ -344,8 +329,7 @@ impl PlasticityTrainer {
             network,
             &session.initial_thresholds,
             &session.initial_weights,
-            total_reward,
-            valid_reward_count,
+            &reward_sum,
         ))
     }
 
@@ -379,24 +363,13 @@ impl PlasticityTrainer {
 
     pub(crate) fn accumulate_step(
         summary: &mut TrainingSummary,
-        total_reward: &mut f64,
-        valid_reward_count: &mut u32,
+        reward_sum: &mut ExactRewardSum,
         example: &TrainingExample,
         spikes: &[usize],
     ) {
-        if example.reward.is_finite() {
-            // Widen before summing: finite f32 rewards can overflow an f32 total.
-            *total_reward += f64::from(example.reward);
-            *valid_reward_count += 1;
-        }
+        accumulate_reward(example, reward_sum);
         summary.steps_processed += 1;
-
-        summary.total_spikes += spikes.len() as u64;
-        for &idx in spikes {
-            if idx < summary.per_neuron_spikes.len() {
-                summary.per_neuron_spikes[idx] += 1;
-            }
-        }
+        record_step_spikes(summary, spikes);
     }
 
     pub(crate) fn finalize_summary(
@@ -404,28 +377,15 @@ impl PlasticityTrainer {
         network: &SpikingNetwork,
         initial_thresholds: &[f32],
         initial_weights: &[Vec<f32>],
-        total_reward: f64,
-        valid_reward_count: u32,
+        reward_sum: &ExactRewardSum,
     ) -> TrainingSummary {
-        summary.avg_reward = if valid_reward_count > 0 {
-            (total_reward / f64::from(valid_reward_count)) as f32
-        } else {
-            0.0
-        };
-
-        let final_thresholds = network.get_thresholds();
-        for i in 0..network.neurons.len() {
-            summary
-                .threshold_drifts
-                .push(final_thresholds[i] - initial_thresholds[i]);
-
-            let mut w_deltas = Vec::new();
-            for (ch, &w) in network.neurons[i].weights.iter().enumerate() {
-                w_deltas.push(w - initial_weights[i][ch]);
-            }
-            summary.weight_drifts.push(w_deltas);
-        }
-
+        finish_summary(
+            &mut summary,
+            network,
+            initial_thresholds,
+            initial_weights,
+            reward_sum,
+        );
         summary
     }
 
@@ -461,12 +421,11 @@ impl PlasticityTrainer {
         observer: &mut O,
     ) -> Result<TrainingSummary, TrainerError> {
         let mut session = start_session(network, data)?;
-        let mut total_reward = 0.0;
-        let mut valid_reward_count = 0;
+        let mut reward_sum = ExactRewardSum::default();
 
         for (step_index, example) in data.iter().enumerate() {
             let spikes = self.train_step(network, &example.stimuli, example.reward)?;
-            accumulate_reward(example, &mut total_reward, &mut valid_reward_count);
+            accumulate_reward(example, &mut reward_sum);
             session.summary.steps_processed += 1;
             record_step_spikes(&mut session.summary, &spikes);
             observer
@@ -492,8 +451,7 @@ impl PlasticityTrainer {
             network,
             &session.initial_thresholds,
             &session.initial_weights,
-            total_reward,
-            valid_reward_count,
+            &reward_sum,
         );
         Ok(session.summary)
     }
@@ -522,14 +480,51 @@ fn start_session(
     })
 }
 
-fn accumulate_reward(
-    example: &TrainingExample,
-    total_reward: &mut f64,
-    valid_reward_count: &mut usize,
-) {
+/// Non-overlapping `f64` components of a finite-reward sum.
+///
+/// A running `f64` sum drops an `f32` reward smaller than the unit in the last
+/// place of an opposing extreme value. `two_sum` keeps that roundoff, so later
+/// cancellation still recovers it. Session admission rejects non-finite rewards
+/// before either helper runs.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct ExactRewardSum {
+    parts: Vec<f64>,
+    count: u32,
+}
+
+impl ExactRewardSum {
+    fn add(&mut self, value: f64) {
+        let mut remainder = value;
+        for part in &mut self.parts {
+            let (sum, error) = two_sum(*part, remainder);
+            *part = sum;
+            remainder = error;
+            if remainder == 0.0 {
+                return;
+            }
+        }
+        self.parts.push(remainder);
+    }
+
+    fn total(&self) -> f64 {
+        self.parts.iter().rev().fold(0.0, |sum, part| sum + part)
+    }
+}
+
+/// Dekker's `two_sum`: `sum + error` equals `a + b` for finite inputs.
+fn two_sum(a: f64, b: f64) -> (f64, f64) {
+    let sum = a + b;
+    let b_virtual = sum - a;
+    let a_virtual = sum - b_virtual;
+    let b_roundoff = b - b_virtual;
+    let a_roundoff = a - a_virtual;
+    (sum, a_roundoff + b_roundoff)
+}
+
+fn accumulate_reward(example: &TrainingExample, reward_sum: &mut ExactRewardSum) {
     if example.reward.is_finite() {
-        *total_reward += f64::from(example.reward);
-        *valid_reward_count += 1;
+        reward_sum.add(f64::from(example.reward));
+        reward_sum.count += 1;
     }
 }
 
@@ -574,11 +569,10 @@ fn finish_summary(
     network: &SpikingNetwork,
     initial_thresholds: &[f32],
     initial_weights: &[Vec<f32>],
-    total_reward: f64,
-    valid_reward_count: usize,
+    reward_sum: &ExactRewardSum,
 ) {
-    summary.avg_reward = if valid_reward_count > 0 {
-        (total_reward / valid_reward_count as f64) as f32
+    summary.avg_reward = if reward_sum.count > 0 {
+        (reward_sum.total() / f64::from(reward_sum.count)) as f32
     } else {
         0.0
     };
@@ -1217,6 +1211,63 @@ mod tests {
             self.dopamine.push(event.modulators.dopamine);
             self.norepinephrine.push(event.modulators.norepinephrine);
             Ok(())
+        }
+    }
+
+    fn summaries_for_rewards(rewards: &[f32], use_reward_modulation: bool) -> [TrainingSummary; 3] {
+        let config = TrainingConfig {
+            use_reward_modulation,
+            ..TrainingConfig::default()
+        };
+        let batch: Vec<_> = rewards
+            .iter()
+            .map(|&reward| TrainingExample {
+                stimuli: vec![0.0; 8],
+                reward,
+            })
+            .collect();
+
+        let mut trainer = PlasticityTrainer::new(config);
+        let mut network = small_network();
+        let ordinary = trainer
+            .run_session(&mut network, &batch)
+            .expect("ordinary session");
+
+        let mut trainer = PlasticityTrainer::new(config);
+        let mut network = small_network();
+        let mut rng = StdRng::seed_from_u64(42);
+        let seeded = trainer
+            .run_session_with_rng(&mut network, &batch, &mut rng)
+            .expect("seeded session");
+
+        let mut trainer = PlasticityTrainer::new(config);
+        let mut network = small_network();
+        let mut observer = RecordingObserver::default();
+        let observed = trainer
+            .run_session_with_observer(&mut network, &batch, &mut observer)
+            .expect("observer session");
+
+        [ordinary, seeded, observed]
+    }
+
+    #[test]
+    fn finite_reward_batches_have_finite_correct_means_across_session_apis() {
+        let cases: &[(&[f32], f32)] = &[
+            (&[f32::MAX, f32::MAX], f32::MAX),
+            (&[-f32::MAX, -f32::MAX], -f32::MAX),
+            (&[f32::MAX, f32::MAX, -f32::MAX, -f32::MAX], 0.0),
+            (&[f32::MAX, 1.0, -f32::MAX], 1.0 / 3.0),
+            (&[-f32::MAX, 1.0, f32::MAX], 1.0 / 3.0),
+            (&[0.4, -0.1, 0.0], 0.1),
+        ];
+
+        for use_reward_modulation in [true, false] {
+            for &(rewards, expected) in cases {
+                for summary in summaries_for_rewards(rewards, use_reward_modulation) {
+                    assert!(summary.avg_reward.is_finite());
+                    assert_eq!(summary.avg_reward, expected);
+                }
+            }
         }
     }
 

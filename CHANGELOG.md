@@ -33,9 +33,9 @@ Published to crates.io on 2026-09-19.
 
 ### Fixed
 
-- Session reward means now use a wider accumulator so finite extreme rewards
-  do not overflow `TrainingSummary::avg_reward` in ordinary, seeded, or observer
-  sessions (#115).
+- Session reward means now use exact widened summation so finite extreme
+  rewards neither overflow nor lose a later-cancelled small reward in
+  `TrainingSummary::avg_reward` (#115).
 
 ### Added
 

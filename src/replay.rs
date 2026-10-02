@@ -12,7 +12,7 @@ use rand::rngs::StdRng;
 use serde::{Deserialize, Serialize};
 
 use crate::config::TrainingConfig;
-use crate::trainer::{PlasticityTrainer, TrainingExample, TrainingSummary};
+use crate::trainer::{ExactRewardSum, PlasticityTrainer, TrainingExample, TrainingSummary};
 
 /// Stochastic input encoding is skipped at or below this magnitude (neuromod
 /// `SpikingNetwork::step` contract).
@@ -251,21 +251,14 @@ fn run_recorded_session(
         per_neuron_spikes: vec![0; network.neurons.len()],
         ..TrainingSummary::default()
     };
-    let mut total_reward = 0.0;
-    let mut valid_reward_count = 0;
+    let mut reward_sum = ExactRewardSum::default();
 
     for (tick, example) in batch.iter().enumerate() {
         let spikes = trainer
             .train_step_with_rng(&mut network, &example.stimuli, example.reward, &mut rng)
             .expect("seeded step");
         ticks.push(capture_tick(tick, &spikes, &network));
-        PlasticityTrainer::accumulate_step(
-            &mut summary,
-            &mut total_reward,
-            &mut valid_reward_count,
-            example,
-            &spikes,
-        );
+        PlasticityTrainer::accumulate_step(&mut summary, &mut reward_sum, example, &spikes);
     }
 
     SessionOutcome {
@@ -274,8 +267,7 @@ fn run_recorded_session(
             &network,
             &initial_thresholds,
             &initial_weights,
-            total_reward,
-            valid_reward_count,
+            &reward_sum,
         ),
         network,
         ticks,

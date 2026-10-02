@@ -12,6 +12,10 @@
 .mimocode/
 .vscode/
 .opencode/
+/docs/superpowers/
+
+# Orb portal metadata is machine-local.
+/.amp/portals/*
 
 # Ignore local Cursor IDE state, but keep the cloud agent environment config
 # tracked (mirrors the .devin/blueprint.yaml carve-out below).

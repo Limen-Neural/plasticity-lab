@@ -31,6 +31,12 @@ Published to crates.io on 2026-09-19.
 
 ## [Unreleased]
 
+### Fixed
+
+- Session reward means now use a wider accumulator so finite extreme rewards
+  do not overflow `TrainingSummary::avg_reward` in ordinary, seeded, or observer
+  sessions (#115).
+
 ### Added
 
 - Synthetic delayed-reward association integration benchmark (LIM-1298): two

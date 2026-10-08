@@ -30,6 +30,10 @@ RUN rustup component add rustfmt clippy llvm-tools-preview
 RUN printf 'export PATH=%s:$PATH\n' "$CARGO_HOME/bin" > /etc/profile.d/cargo.sh \
     && chmod 0644 /etc/profile.d/cargo.sh
 
+# Shells that neither read the login profile nor inherit the image's ENV still need
+# cargo: link the rustup proxies into /usr/local/bin (on every default PATH).
+RUN ln -sf "$CARGO_HOME"/bin/* /usr/local/bin/
+
 # Cloud agents run as the `ubuntu` user. Create it (Debian base has no such
 # user), grant passwordless sudo, and hand over the shared Rust toolchain dirs
 # plus the workspace so the agent can build and write target/ without root.
@@ -40,7 +44,10 @@ RUN if ! id -u ubuntu >/dev/null 2>&1; then useradd -m -s /bin/bash ubuntu; fi \
     && echo "ubuntu ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/ubuntu \
     && chmod 0440 /etc/sudoers.d/ubuntu \
     && mkdir -p /workspace \
-    && chown -R ubuntu:ubuntu "$CARGO_HOME" "$RUSTUP_HOME" /workspace
+    && chown -R ubuntu:ubuntu "$CARGO_HOME" "$RUSTUP_HOME" /workspace \
+    && ln -s "$RUSTUP_HOME" /home/ubuntu/.rustup \
+    && ln -s "$CARGO_HOME" /home/ubuntu/.cargo \
+    && chown -h ubuntu:ubuntu /home/ubuntu/.rustup /home/ubuntu/.cargo
 
 USER ubuntu
 WORKDIR /workspace

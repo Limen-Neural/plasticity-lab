@@ -19,10 +19,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Rust 1.98.1
+      - name: Install Rust 1.99.0
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # pinned action
         with:
-          toolchain: 1.98.1
+          toolchain: 1.99.0
           components: clippy, rustfmt
 
       - name: Cache cargo registry
@@ -154,10 +154,10 @@ jobs:
           persist-credentials: false
 
       # Toolchain version must match package.rust-version in Cargo.toml.
-      - name: Install MSRV toolchain (1.98.1)
+      - name: Install MSRV toolchain (1.99.0)
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # pinned action
         with:
-          toolchain: "1.98.1"
+          toolchain: "1.99.0"
 
       - name: Cache cargo registry
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
@@ -172,10 +172,10 @@ jobs:
       # Pinned explicitly (not the default/repo-pinned toolchain) so this job keeps
       # testing the declared MSRV even if rust-toolchain.toml advances later.
       - name: Build at MSRV
-        run: cargo +1.98.1 build --locked --all-features
+        run: cargo +1.99.0 build --locked --all-features
 
       - name: Test at MSRV
-        run: cargo +1.98.1 test --locked --all-features
+        run: cargo +1.99.0 test --locked --all-features
 
   browser-wasm:
     name: Browser WASM
@@ -187,10 +187,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Install Rust 1.98.1 with the WASM target
+      - name: Install Rust 1.99.0 with the WASM target
         uses: dtolnay/rust-toolchain@29eef336d9b2848a0b548edc03f92a220660cdb8 # pinned action
         with:
-          toolchain: 1.98.1
+          toolchain: 1.99.0
           targets: wasm32-unknown-unknown
 
       - name: Cache cargo registry
@@ -204,17 +204,17 @@ jobs:
           restore-keys: ${{ runner.os }}-cargo-browser-wasm-
 
       - name: Check browser WASM
-        run: cargo +1.98.1 check --locked --target wasm32-unknown-unknown --no-default-features --features wasm-js
+        run: cargo +1.99.0 check --locked --target wasm32-unknown-unknown --no-default-features --features wasm-js
 
       - name: Check browser WASM with critic
-        run: cargo +1.98.1 check --locked --target wasm32-unknown-unknown --no-default-features --features critic,wasm-js
+        run: cargo +1.99.0 check --locked --target wasm32-unknown-unknown --no-default-features --features critic,wasm-js
 
       - name: Verify browser entropy feature is opt-in
         shell: bash
         run: |
           set -euo pipefail
-          enabled="$(cargo +1.98.1 tree --locked --target wasm32-unknown-unknown --no-default-features --features wasm-js -e features -i getrandom)"
-          disabled="$(cargo +1.98.1 tree --locked --target wasm32-unknown-unknown --no-default-features -e features -i getrandom)"
+          enabled="$(cargo +1.99.0 tree --locked --target wasm32-unknown-unknown --no-default-features --features wasm-js -e features -i getrandom)"
+          disabled="$(cargo +1.99.0 tree --locked --target wasm32-unknown-unknown --no-default-features -e features -i getrandom)"
 
           grep -F 'getrandom feature "wasm_js"' <<<"${enabled}"
           if grep -F 'getrandom feature "wasm_js"' <<<"${disabled}"; then

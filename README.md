@@ -63,7 +63,7 @@ See also the ownership boundary with [SynapticDistill.jl](#boundary-with-synapti
 
 ### Prerequisites
 
-- Rust 1.98.1 toolchain ([rustup](https://rustup.rs/)) — pinned in `rust-toolchain.toml`
+- Rust 1.99.0 toolchain ([rustup](https://rustup.rs/)) — pinned in `rust-toolchain.toml`
 - Access to crates.io
 - Optional: a VS Code Dev Container setup is included under `.devcontainer/`
 

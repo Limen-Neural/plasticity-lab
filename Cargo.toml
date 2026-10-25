@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = ["snn", "stdp", "plasticity", "neuromodulation", "reward-modulation"]
 categories = ["science", "simulation"]
 # Matches the minimum supported Rust version of neuromod 0.7.0.
-rust-version = "1.98.1"
+rust-version = "1.99.0"
 # Only consumer-facing source, examples, and licensing belong in the archive.
 include = [
     "/src/**",

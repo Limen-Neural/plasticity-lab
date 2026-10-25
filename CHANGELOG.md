@@ -72,6 +72,10 @@ Published to crates.io on 2026-09-19.
 - Require registry `neuromod 0.7.0` for the frozen stepping APIs. The temporary
   Git revision used during development has been removed.
 
+- Minimum supported Rust version raised from 1.98.1 to 1.99.0; the pinned
+  toolchain, CI jobs, devcontainer, Cursor, and Devin environments move in
+  lockstep.
+
 ### Changed (breaking)
 
 - `TrainerError::EmptyBatch` and `TrainerError::InvalidSample` now use

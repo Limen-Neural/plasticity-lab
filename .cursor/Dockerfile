@@ -4,7 +4,7 @@
 # dev container. The Rust version below is hardcoded and does NOT derive from
 # rust-toolchain.toml, so it goes stale silently if skipped on a toolchain bump
 # (see CLAUDE.md's toolchain-bump checklist). Keep it in sync.
-FROM rust:1.98.1-slim-bookworm
+FROM rust:1.99.0-slim-bookworm
 
 # ca-certificates + git resolve the Limen-Neural git dependencies over HTTPS;
 # curl/build-essential/pkg-config cover native builds and the cargo-deny /

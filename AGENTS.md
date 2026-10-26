@@ -29,19 +29,19 @@ Single Rust crate; part of the Limen-Neural ecosystem.
 
 ## Toolchain
 
-- Rust 2024 edition, pinned to `1.98.1` in `rust-toolchain.toml`
+- Rust 2024 edition, pinned to `1.99.0` in `rust-toolchain.toml`
 - CI uses the same pinned toolchain
 
 ## Dev container
 
 - VS Code Dev Container configuration is in `.devcontainer/`
-- Base image: `rust:1.98.1-slim-bookworm`
+- Base image: `rust:1.99.0-slim-bookworm`
 - `cargo fetch` runs on container creation
 - Run locally with: `devcontainer up --workspace-folder .`
 
 ## Cursor Cloud specific instructions
 
-- The Cursor cloud-agent environment is defined in `.cursor/environment.json` + `.cursor/Dockerfile` (base image `rust:1.98.1-slim-bookworm`, running as the `ubuntu` user). Both files are force-tracked via a `.gitignore` carve-out; the rest of `.cursor/` stays ignored.
+- The Cursor cloud-agent environment is defined in `.cursor/environment.json` + `.cursor/Dockerfile` (base image `rust:1.99.0-slim-bookworm`, running as the `ubuntu` user). Both files are force-tracked via a `.gitignore` carve-out; the rest of `.cursor/` stays ignored.
 - The Build's `install` step runs `cargo fetch --locked && cargo build --locked --all-features && cargo test --no-run --locked --all-features`, so registry dependencies plus the all-features build and test-harness caches are warm before an agent starts.
 - `.cursor/Dockerfile`'s `FROM rust:<version>` hardcodes the toolchain version independently of `rust-toolchain.toml` — bump it alongside the other version-pinned files on any toolchain change (see CLAUDE.md's toolchain-bump checklist).
 - This is a library crate with no binary/server to launch, so there is no `start` command; verify the environment by running the CI checks (`cargo build`/`test`/`clippy`/`fmt`) rather than starting an app.

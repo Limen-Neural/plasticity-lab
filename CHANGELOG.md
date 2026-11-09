@@ -67,6 +67,10 @@ Published to crates.io on 2026-09-19.
   JSON omission is covered by
   `old_and_partial_json_default_missing_reward_mapping_fields`.
 
+- Package metadata now sets `homepage` (the GitHub repository) and
+  `documentation` (`https://docs.rs/plasticity-lab`), so crates.io shows
+  Homepage and Documentation links from the next release (#123).
+
 ### Dependencies
 
 - Require registry `neuromod 0.7.0` for the frozen stepping APIs. The temporary

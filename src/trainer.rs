@@ -275,29 +275,9 @@ impl PlasticityTrainer {
         network: &mut SpikingNetwork,
         data: &[TrainingExample],
     ) -> Result<TrainingSummary, TrainerError> {
-        let mut session = start_session(network, data)?;
-        let mut total_reward = 0.0;
-        let mut valid_reward_count = 0;
-
-        for example in data {
-            let spikes = self.train_step(network, &example.stimuli, example.reward)?;
-            Self::accumulate_step(
-                &mut session.summary,
-                &mut total_reward,
-                &mut valid_reward_count,
-                example,
-                &spikes,
-            );
-        }
-
-        Ok(Self::finalize_summary(
-            session.summary,
-            network,
-            &session.initial_thresholds,
-            &session.initial_weights,
-            total_reward,
-            valid_reward_count,
-        ))
+        Self::replay_batch(network, data, |network, example| {
+            self.train_step(network, &example.stimuli, example.reward)
+        })
     }
 
     /// Replays a batch using a caller-supplied RNG for every network step.
@@ -323,30 +303,9 @@ impl PlasticityTrainer {
         data: &[TrainingExample],
         rng: &mut R,
     ) -> Result<TrainingSummary, TrainerError> {
-        let mut session = start_session(network, data)?;
-        let mut total_reward = 0.0;
-        let mut valid_reward_count = 0;
-
-        for example in data {
-            let spikes =
-                self.train_step_with_rng(network, &example.stimuli, example.reward, rng)?;
-            Self::accumulate_step(
-                &mut session.summary,
-                &mut total_reward,
-                &mut valid_reward_count,
-                example,
-                &spikes,
-            );
-        }
-
-        Ok(Self::finalize_summary(
-            session.summary,
-            network,
-            &session.initial_thresholds,
-            &session.initial_weights,
-            total_reward,
-            valid_reward_count,
-        ))
+        Self::replay_batch(network, data, |network, example| {
+            self.train_step_with_rng(network, &example.stimuli, example.reward, rng)
+        })
     }
 
     /// Computes the modulator vector `train_step` would pass into `network.step`.
@@ -377,56 +336,21 @@ impl PlasticityTrainer {
         modulators
     }
 
-    pub(crate) fn accumulate_step(
-        summary: &mut TrainingSummary,
-        total_reward: &mut f64,
-        valid_reward_count: &mut u32,
-        example: &TrainingExample,
-        spikes: &[usize],
-    ) {
-        if example.reward.is_finite() {
-            // Widen before summing: finite f32 rewards can overflow an f32 total.
-            *total_reward += f64::from(example.reward);
-            *valid_reward_count += 1;
+    /// Admits `data`, then folds `step` over every example into a summary.
+    fn replay_batch<F>(
+        network: &mut SpikingNetwork,
+        data: &[TrainingExample],
+        mut step: F,
+    ) -> Result<TrainingSummary, TrainerError>
+    where
+        F: FnMut(&mut SpikingNetwork, &TrainingExample) -> Result<Vec<usize>, TrainerError>,
+    {
+        let mut session = start_session(network, data)?;
+        for example in data {
+            let spikes = step(network, example)?;
+            session.record(example, &spikes);
         }
-        summary.steps_processed += 1;
-
-        summary.total_spikes += spikes.len() as u64;
-        for &idx in spikes {
-            if idx < summary.per_neuron_spikes.len() {
-                summary.per_neuron_spikes[idx] += 1;
-            }
-        }
-    }
-
-    pub(crate) fn finalize_summary(
-        mut summary: TrainingSummary,
-        network: &SpikingNetwork,
-        initial_thresholds: &[f32],
-        initial_weights: &[Vec<f32>],
-        total_reward: f64,
-        valid_reward_count: u32,
-    ) -> TrainingSummary {
-        summary.avg_reward = if valid_reward_count > 0 {
-            (total_reward / f64::from(valid_reward_count)) as f32
-        } else {
-            0.0
-        };
-
-        let final_thresholds = network.get_thresholds();
-        for i in 0..network.neurons.len() {
-            summary
-                .threshold_drifts
-                .push(final_thresholds[i] - initial_thresholds[i]);
-
-            let mut w_deltas = Vec::new();
-            for (ch, &w) in network.neurons[i].weights.iter().enumerate() {
-                w_deltas.push(w - initial_weights[i][ch]);
-            }
-            summary.weight_drifts.push(w_deltas);
-        }
-
-        summary
+        Ok(session.finish(network))
     }
 
     /// Replays a batch like [`Self::run_session`], notifying `observer` after
@@ -461,14 +385,10 @@ impl PlasticityTrainer {
         observer: &mut O,
     ) -> Result<TrainingSummary, TrainerError> {
         let mut session = start_session(network, data)?;
-        let mut total_reward = 0.0;
-        let mut valid_reward_count = 0;
 
         for (step_index, example) in data.iter().enumerate() {
             let spikes = self.train_step(network, &example.stimuli, example.reward)?;
-            accumulate_reward(example, &mut total_reward, &mut valid_reward_count);
-            session.summary.steps_processed += 1;
-            record_step_spikes(&mut session.summary, &spikes);
+            session.record(example, &spikes);
             observer
                 .on_step(step_event(
                     step_index,
@@ -487,50 +407,78 @@ impl PlasticityTrainer {
                 })?;
         }
 
-        finish_summary(
-            &mut session.summary,
-            network,
-            &session.initial_thresholds,
-            &session.initial_weights,
-            total_reward,
-            valid_reward_count,
-        );
-        Ok(session.summary)
+        Ok(session.finish(network))
     }
 }
 
-struct SessionPrep {
+/// Running state of one batch replay: the summary plus the pre-session
+/// snapshot that drift is measured against.
+pub(crate) struct SessionTally {
     summary: TrainingSummary,
     initial_thresholds: Vec<f32>,
     initial_weights: Vec<Vec<f32>>,
+    total_reward: f64,
+    valid_reward_count: usize,
+}
+
+impl SessionTally {
+    /// Snapshots `network` without validating any batch.
+    pub(crate) fn begin(network: &SpikingNetwork) -> Self {
+        Self {
+            summary: TrainingSummary {
+                per_neuron_spikes: vec![0; network.neurons.len()],
+                ..TrainingSummary::default()
+            },
+            initial_thresholds: network.get_thresholds(),
+            initial_weights: network.neurons.iter().map(|n| n.weights.clone()).collect(),
+            total_reward: 0.0,
+            valid_reward_count: 0,
+        }
+    }
+
+    /// Records one completed step.
+    pub(crate) fn record(&mut self, example: &TrainingExample, spikes: &[usize]) {
+        if example.reward.is_finite() {
+            // Widen before summing: finite f32 rewards can overflow an f32 total.
+            self.total_reward += f64::from(example.reward);
+            self.valid_reward_count += 1;
+        }
+        self.summary.steps_processed += 1;
+        record_step_spikes(&mut self.summary, spikes);
+    }
+
+    /// Fills in the mean reward and drifts against the starting snapshot.
+    pub(crate) fn finish(mut self, network: &SpikingNetwork) -> TrainingSummary {
+        self.summary.avg_reward = if self.valid_reward_count > 0 {
+            (self.total_reward / self.valid_reward_count as f64) as f32
+        } else {
+            0.0
+        };
+
+        let final_thresholds = network.get_thresholds();
+        for (i, neuron) in network.neurons.iter().enumerate() {
+            self.summary
+                .threshold_drifts
+                .push(final_thresholds[i] - self.initial_thresholds[i]);
+            self.summary.weight_drifts.push(
+                neuron
+                    .weights
+                    .iter()
+                    .zip(&self.initial_weights[i])
+                    .map(|(w, w0)| w - w0)
+                    .collect(),
+            );
+        }
+        self.summary
+    }
 }
 
 fn start_session(
     network: &SpikingNetwork,
     data: &[TrainingExample],
-) -> Result<SessionPrep, TrainerError> {
+) -> Result<SessionTally, TrainerError> {
     admit_batch(network, data)?;
-    let mut summary = TrainingSummary::default();
-    let initial_thresholds = network.get_thresholds();
-    let initial_weights: Vec<Vec<f32>> =
-        network.neurons.iter().map(|n| n.weights.clone()).collect();
-    summary.per_neuron_spikes = vec![0; network.neurons.len()];
-    Ok(SessionPrep {
-        summary,
-        initial_thresholds,
-        initial_weights,
-    })
-}
-
-fn accumulate_reward(
-    example: &TrainingExample,
-    total_reward: &mut f64,
-    valid_reward_count: &mut usize,
-) {
-    if example.reward.is_finite() {
-        *total_reward += f64::from(example.reward);
-        *valid_reward_count += 1;
-    }
+    Ok(SessionTally::begin(network))
 }
 
 fn record_step_spikes(summary: &mut TrainingSummary, spikes: &[usize]) {
@@ -566,34 +514,6 @@ fn observer_abort(step_index: usize, steps_processed: usize, cause: String) -> T
         step_index,
         steps_processed,
         cause,
-    }
-}
-
-fn finish_summary(
-    summary: &mut TrainingSummary,
-    network: &SpikingNetwork,
-    initial_thresholds: &[f32],
-    initial_weights: &[Vec<f32>],
-    total_reward: f64,
-    valid_reward_count: usize,
-) {
-    summary.avg_reward = if valid_reward_count > 0 {
-        (total_reward / valid_reward_count as f64) as f32
-    } else {
-        0.0
-    };
-
-    let final_thresholds = network.get_thresholds();
-    for i in 0..network.neurons.len() {
-        summary
-            .threshold_drifts
-            .push(final_thresholds[i] - initial_thresholds[i]);
-
-        let mut w_deltas = Vec::new();
-        for (ch, &w) in network.neurons[i].weights.iter().enumerate() {
-            w_deltas.push(w - initial_weights[i][ch]);
-        }
-        summary.weight_drifts.push(w_deltas);
     }
 }
 

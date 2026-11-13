@@ -5,32 +5,6 @@ All notable changes to this project are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1] - 2026-09-19
-
-Published to crates.io on 2026-09-19.
-
-### Added
-
-- Explicit CI coverage for `--no-default-features` and `--features critic`,
-  plus `tests/feature_matrix.rs` so optional sister crates cannot silently
-  leak into the core API.
-
-### Fixed
-
-- `train_step` now skips neuromodulator updates for all non-finite rewards
-  (`NaN` and ±infinity), not only `NaN`. Session preflight still rejects
-  infinite rewards; `avg_reward` continues to omit non-finite values.
-
-- The documented starter session now initializes a nonzero equal-share weight
-  budget and includes a regression smoke test that proves spikes and weight
-  drift occur.
-
-- The Linear release workflow now targets the `plasticity-lab` pipeline by
-  name, supports dry runs, and fails closed when the selected release does not
-  match the expected crate.
-
-## [Unreleased]
-
 ## [0.3.0] - 2026-11-13
 
 Published to crates.io on 2026-11-13.
@@ -139,6 +113,32 @@ Published to crates.io on 2026-11-13.
   `TrainerError::Step(error)`. Match `SampleInvariant::InfiniteReward` as
   `TrainerError::NonFiniteReward { index }` instead (`index: None` on direct
   steps, `Some(sample_index)` on batch APIs).
+
+## [Unreleased]
+
+## [0.2.1] - 2026-09-19
+
+Published to crates.io on 2026-09-19.
+
+### Added
+
+- Explicit CI coverage for `--no-default-features` and `--features critic`,
+  plus `tests/feature_matrix.rs` so optional sister crates cannot silently
+  leak into the core API.
+
+### Fixed
+
+- `train_step` now skips neuromodulator updates for all non-finite rewards
+  (`NaN` and ±infinity), not only `NaN`. Session preflight still rejects
+  infinite rewards; `avg_reward` continues to omit non-finite values.
+
+- The documented starter session now initializes a nonzero equal-share weight
+  budget and includes a regression smoke test that proves spikes and weight
+  drift occur.
+
+- The Linear release workflow now targets the `plasticity-lab` pipeline by
+  name, supports dry runs, and fails closed when the selected release does not
+  match the expected crate.
 
 ## [0.2.0] - 2026-09-17
 

@@ -82,7 +82,7 @@ default/all-feature suite runs reproduced success.
 Environment: Linux x86_64, Rust 1.98.1, registry neuromod 0.7.0, rand 0.10.3,
 unchanged Cargo.lock. SmallRng results are version/target dependent. This is
 evidence for this synthetic assay, not general task accuracy or superiority
-to same-step reward. See the [README protocol](../../README.md#delayed-reward-association-benchmark-unreleased-v03).
+to same-step reward. See the [README protocol](../../README.md#delayed-reward-association-benchmark).
 
 ## Review clarifications (no protocol changes)
 

@@ -31,6 +31,10 @@ Published to crates.io on 2026-09-19.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-13
+
+Published to crates.io on 2026-11-13.
+
 ### Fixed
 
 - Session reward means now use a wider accumulator so finite extreme rewards

@@ -1,8 +1,8 @@
 # Release process
 
-`0.2.1` was published on 2026-09-19. Run this checklist from a clean
-checkout of the exact commit intended for a future release. Do not tag it or
-describe a future version as published until `cargo publish` succeeds.
+`0.3.0` is the current release candidate. Run this checklist from a clean
+checkout of the exact commit intended for release. Do not tag it or describe
+it as published until `cargo publish` succeeds.
 
 Capture the release checkout before running any step:
 
@@ -15,10 +15,10 @@ test -z "$(git status --porcelain)"
 ## 1. Confirm the release manifest
 
 The next release candidate must use published registry dependencies. For the
-unreleased v0.3 evaluation API, that means:
+0.3.0 evaluation API, that means:
 
 ```toml
-plasticity-lab = "0.3.0" # after the release version is set
+plasticity-lab = "0.3.0"
 neuromod = "0.7.0"
 limbic-critic = "0.3.0" # optional, enabled by the `critic` feature
 ```
